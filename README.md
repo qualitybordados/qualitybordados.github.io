@@ -36,6 +36,8 @@ Crea un archivo `.env` (o configura en GitHub Pages → Repository Variables) co
 VITE_FIREBASE_API_KEY=xxxxx
 VITE_FIREBASE_AUTH_DOMAIN=xxxxx.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=xxxxx
+VITE_FIREBASE_STORAGE_BUCKET=xxxxx.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=xxxxxxxxxxxx
 VITE_FIREBASE_APP_ID=1:xxxx:web:xxxx
 # Opcional para despliegues en subdirectorios (GitHub Pages)
 VITE_PUBLIC_BASE_PATH=/qualitybordados.github.io/
