@@ -1,0 +1,54 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { actualizarEstadoPedido, createPedido, eliminarPedido, fetchPedidos, updatePedido } from './api'
+import { PedidoEstado } from '@/lib/types'
+import { PedidoForm } from '@/lib/validators'
+
+const PEDIDOS_KEY = ['pedidos']
+
+type PedidosFilters = {
+  status?: PedidoEstado | 'TODOS'
+  prioridad?: string
+  clienteId?: string
+}
+
+export function usePedidos(filters: PedidosFilters = {}) {
+  return useQuery({
+    queryKey: [...PEDIDOS_KEY, filters],
+    queryFn: () => fetchPedidos(filters),
+    staleTime: 1000 * 30,
+  })
+}
+
+export function useCreatePedido() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { data: PedidoForm; usuarioId: string }) => createPedido(payload.data, payload.usuarioId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }),
+  })
+}
+
+export function useUpdatePedido() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { id: string; data: Partial<PedidoForm>; usuarioId: string }) =>
+      updatePedido(payload.id, payload.data, payload.usuarioId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }),
+  })
+}
+
+export function useActualizarEstadoPedido() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { id: string; estado: PedidoEstado; usuarioId: string; data?: Parameters<typeof actualizarEstadoPedido>[3] }) =>
+      actualizarEstadoPedido(payload.id, payload.estado, payload.usuarioId, payload.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }),
+  })
+}
+
+export function useEliminarPedido() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { id: string; usuarioId: string }) => eliminarPedido(payload.id, payload.usuarioId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }),
+  })
+}
