@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const base = env?.VITE_PUBLIC_BASE_PATH?.length ? env.VITE_PUBLIC_BASE_PATH : '/'
+  const base = env?.VITE_PUBLIC_BASE_PATH?.length ? env.VITE_PUBLIC_BASE_PATH : './'
 
   return {
     base,
@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, 'src'),
       },
+    },
+    build: {
+      outDir: 'docs',
     },
   }
 })
