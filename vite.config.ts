@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'docs',
+      minify: 'terser',
       rollupOptions: {
         output: {
           entryFileNames: 'assets/[name].js',
