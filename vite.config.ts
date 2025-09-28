@@ -16,6 +16,13 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'docs',
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name].js',
+          chunkFileNames: 'assets/[name].js',
+          assetFileNames: 'assets/[name][extname]',
+        },
+      },
     },
   }
 })
