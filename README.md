@@ -43,6 +43,16 @@ VITE_FIREBASE_APP_ID=1:xxxx:web:xxxx
 VITE_PUBLIC_BASE_PATH=/qualitybordados.github.io/
 ```
 
+### Configuración en tiempo de ejecución
+
+Para despliegues estáticos (por ejemplo, GitHub Pages) donde no es deseable
+hornear las credenciales en el bundle, la app admite cargar la configuración de
+Firebase desde un archivo `firebase-config.js` ubicado junto a los assets
+publicados. Copia `public/firebase-config.example.js`, renómbralo a
+`firebase-config.js` y reemplaza los valores de ejemplo por los reales. Durante
+el arranque la app buscará ese archivo; si existe, sus valores tendrán prioridad
+sobre las variables de entorno `VITE_FIREBASE_*`.
+
 ## Instalación y uso local
 
 ```bash

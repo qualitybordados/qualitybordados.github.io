@@ -30,11 +30,39 @@
       const isDocsPath = location.pathname.includes('/docs/')
       const assetBase = isDocsPath ? './' : './docs/'
 
-      if (isLocalhost) {
-        import('/src/main.tsx')
-      } else {
-        import(`${assetBase}assets/main.js`)
+      const loadRuntimeConfig = () => {
+        if (isLocalhost) {
+          return Promise.resolve(false)
+        }
+
+        return new Promise((resolve) => {
+          const script = document.createElement('script')
+          script.src = `${assetBase}firebase-config.js`
+          script.async = false
+          script.onload = () => resolve(true)
+          script.onerror = () => {
+            console.warn(
+              '[Firebase] No runtime config found at',
+              `${assetBase}firebase-config.js`.replace('././', './'),
+              '— falling back to build-time environment variables.',
+            )
+            resolve(false)
+          }
+          document.head.appendChild(script)
+        })
       }
+
+      const bootstrap = async () => {
+        await loadRuntimeConfig()
+
+        if (isLocalhost) {
+          import('/src/main.tsx')
+        } else {
+          import(`${assetBase}assets/main.js`)
+        }
+      }
+
+      bootstrap()
     </script>
   </body>
 </html>
