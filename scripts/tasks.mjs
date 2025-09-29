@@ -70,7 +70,7 @@ export async function cleanDocs() {
 }
 
 function escapeRegExp(input) {
-  return input.replace(/[.*+?^${}()|[\]\]/g, '\\$&')
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function rewriteCssReference(filePath, cssReference) {
