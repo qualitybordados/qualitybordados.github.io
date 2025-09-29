@@ -20,6 +20,16 @@ export async function fetchDashboardData() {
     query(pedidosRef, where('status', 'in', estadosActivos), where('fecha_compromiso', '<=', Timestamp.fromDate(tresDias))),
   )
   const entregasProximas = proximasEntregasSnap.size
+  const proximasEntregas = proximasEntregasSnap.docs.map((docSnap) => {
+    const data = docSnap.data() as Omit<Pedido, 'id'>
+    return {
+      id: docSnap.id,
+      folio: data.folio,
+      cliente: data.cliente_id.id,
+      fecha_compromiso: data.fecha_compromiso.toDate(),
+      status: data.status,
+    }
+  })
 
   const carteraVencidaSnap = await getDocs(
     query(pedidosRef, where('saldo', '>', 0), where('fecha_compromiso', '<', Timestamp.fromDate(now.toDate()))),
@@ -52,5 +62,6 @@ export async function fetchDashboardData() {
     entregasProximas,
     flujoCaja,
     pedidosPorEstado: Array.from(pedidosPorEstadoMap.entries()).map(([estado, total]) => ({ estado, total })),
+    proximasEntregas,
   }
 }

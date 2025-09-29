@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { usePedidosConSaldo, useRegistrarAbono } from '@/features/cobranza/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import dayjs from 'dayjs'
-import { Loader2 } from 'lucide-react'
+import { Calendar, User, AlertTriangle } from 'lucide-react'
 import { EmptyState } from '@/components/common/empty-state'
 import { AbonoForm as AbonoFormValues } from '@/lib/validators'
 
@@ -27,65 +26,44 @@ export default function CobranzaPage() {
   const puedeRegistrar = ['OWNER', 'ADMIN', 'COBRANZA'].includes(role ?? '')
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Pedidos con saldo pendiente</CardTitle>
+    <div className="space-y-6 pb-12">
+      <Card className="border-none bg-white/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Créditos y cobranza</CardTitle>
+          <p className="text-xs text-slate-500">Monitorea los pedidos con saldo pendiente y registra abonos al instante.</p>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Folio</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Saldo</TableHead>
-                <TableHead>Compromiso</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pedidosLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                  </TableCell>
-                </TableRow>
-              ) : pedidos && pedidos.length ? (
-                pedidos.map((pedido) => (
-                  <TableRow key={pedido.id}>
-                    <TableCell>{pedido.folio}</TableCell>
-                    <TableCell>{pedido.cliente_id.id}</TableCell>
-                    <TableCell>{formatCurrency(pedido.saldo)}</TableCell>
-                    <TableCell>{formatDate(pedido.fecha_compromiso.toDate())}</TableCell>
-                    <TableCell>
-                      <Badge variant={pedido.status === 'CERRADO' ? 'success' : 'warning'}>{pedido.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        onClick={() => setPedidoSeleccionado(pedido)}
-                        disabled={!puedeRegistrar}
-                      >
-                        Registrar abono
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10">
-                    <EmptyState title="Sin cartera vencida" description="Todos los pedidos están al corriente." />
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        <CardContent className="flex items-center justify-between text-xs text-slate-500">
+          <span>{pedidos?.length ? `${pedidos.length} pedidos con saldo` : 'Sin cartera vencida'}</span>
+          <Badge variant="warning" className="uppercase">Revisa diariamente</Badge>
         </CardContent>
       </Card>
 
+      <section className="space-y-3">
+        {pedidosLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="border-none bg-white/60 p-4 shadow-sm">
+              <div className="flex animate-pulse flex-col gap-3">
+                <div className="h-4 w-28 rounded-full bg-slate-200" />
+                <div className="h-4 w-40 rounded-full bg-slate-200" />
+              </div>
+            </Card>
+          ))
+        ) : pedidos && pedidos.length ? (
+          pedidos.map((pedido) => (
+            <CobranzaCard
+              key={pedido.id}
+              pedido={pedido}
+              onRegistrar={() => setPedidoSeleccionado(pedido)}
+              disabled={!puedeRegistrar}
+            />
+          ))
+        ) : (
+          <EmptyState title="Sin cartera vencida" description="Todos los pedidos están al corriente." />
+        )}
+      </section>
+
       <Dialog open={!!pedidoSeleccionado} onOpenChange={(open) => !open && setPedidoSeleccionado(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-3xl">
           {pedidoSeleccionado ? (
             <AbonoDialogForm
               pedido={pedidoSeleccionado}
@@ -101,6 +79,59 @@ export default function CobranzaPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function CobranzaCard({
+  pedido,
+  onRegistrar,
+  disabled,
+}: {
+  pedido: any
+  onRegistrar: () => void
+  disabled: boolean
+}) {
+  const fecha = pedido.fecha_compromiso.toDate()
+  const diasVencidos = dayjs().diff(fecha, 'day')
+  const venceHoy = dayjs().diff(fecha, 'day') === 0
+
+  return (
+    <Card className="border-none bg-white/90 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Folio {pedido.folio}</p>
+          <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+            <User className="h-4 w-4 text-slate-400" />
+            {pedido.cliente_id.id}
+          </div>
+        </div>
+        <Badge variant={pedido.status === 'CERRADO' ? 'success' : 'warning'} className="uppercase">
+          {pedido.status.replace(/_/g, ' ')}
+        </Badge>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-slate-500">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            {formatDate(fecha)}
+          </div>
+          <Badge variant={diasVencidos > 0 ? 'destructive' : venceHoy ? 'warning' : 'success'}>
+            {diasVencidos > 0 ? `${diasVencidos} días vencido` : venceHoy ? 'Vence hoy' : 'Al día'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          {formatCurrency(pedido.saldo)} pendientes
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-end">
+        <Button onClick={onRegistrar} disabled={disabled} className="w-full sm:w-auto">
+          Registrar abono
+        </Button>
+      </div>
+    </Card>
   )
 }
 
@@ -143,7 +174,7 @@ function AbonoDialogForm({
         <label className="flex flex-col gap-1 text-sm">
           Método de pago
           <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-3"
+            className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={metodo}
             onChange={(event) => setMetodo(event.target.value as (typeof metodosPago)[number])}
           >

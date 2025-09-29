@@ -1,11 +1,12 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
-import { LogOut, Menu, Settings, Users, ClipboardList, DollarSign, Home, PiggyBank } from 'lucide-react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { LogOut, Menu, Settings, Users, ClipboardList, DollarSign, Home, PiggyBank, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/config/firebase'
 import { useState } from 'react'
 import { clsx } from 'clsx'
+import { Badge } from '@/components/ui/badge'
 
 const navigation = [
   { to: '/app/dashboard', label: 'Dashboard', icon: Home },
@@ -19,31 +20,48 @@ const navigation = [
 export function AppShell() {
   const { user, role } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const location = useLocation()
+
+  const activeNavigation = navigation.find((item) => location.pathname.startsWith(item.to))
 
   async function handleSignOut() {
     await signOut(auth)
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="relative flex min-h-screen bg-slate-100">
+      <div
+        className={clsx(
+          'fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity lg:hidden',
+          isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        onClick={() => setIsMenuOpen(false)}
+      />
+
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-40 w-72 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col gap-6 overflow-y-auto border-r border-slate-200 bg-white px-6 py-6 shadow-xl transition-transform duration-300 ease-out lg:static lg:translate-x-0 lg:shadow-none',
           {
             '-translate-x-full lg:-translate-x-0': !isMenuOpen,
             'translate-x-0': isMenuOpen,
           },
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-6">
-          <Link to="/app/dashboard" className="text-lg font-bold tracking-tight text-primary">
+        <div className="flex items-center justify-between gap-3">
+          <Link to="/app/dashboard" className="text-base font-semibold tracking-tight text-primary">
             Quality Bordados
           </Link>
-          <button className="lg:hidden" onClick={() => setIsMenuOpen(false)} aria-label="Cerrar menú">
-            <LogOut className="h-4 w-4 text-slate-500" />
-          </button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-10 w-10 rounded-full border border-slate-200 lg:hidden"
+            onClick={() => setIsMenuOpen(false)}
+            aria-label="Cerrar menú"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-4">
+        <nav className="flex flex-1 flex-col gap-2">
           {navigation.map((item) => {
             const Icon = item.icon
             return (
@@ -52,45 +70,55 @@ export function AppShell() {
                 to={item.to}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-100',
-                    isActive ? 'bg-slate-900 text-white hover:bg-slate-900/90' : 'text-slate-600',
+                    'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
                   )
                 }
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-5 w-5" />
                 {item.label}
               </NavLink>
             )
           })}
         </nav>
-        <div className="border-t border-slate-200 p-4 text-xs text-slate-500">
-          <p className="font-medium text-slate-700">{user?.email}</p>
-          <p className="capitalize">Rol: {role?.toLowerCase() ?? 'sin rol'}</p>
-          <Button variant="outline" className="mt-3 w-full" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-600">
+          <div>
+            <p className="font-semibold text-slate-800">{user?.displayName ?? 'Equipo Quality'}</p>
+            <p className="text-xs text-slate-500">{user?.email}</p>
+          </div>
+          <Button variant="outline" className="w-full" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" />
+            <span>Cerrar sesión</span>
           </Button>
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col lg:ml-72">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-8">
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-72">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-primary px-4 text-primary-foreground shadow-sm sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" className="lg:hidden" onClick={() => setIsMenuOpen((prev) => !prev)}>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-10 w-10 bg-primary-foreground text-primary lg:hidden"
+              onClick={() => setIsMenuOpen(true)}
+              aria-label="Abrir menú"
+            >
               <Menu className="h-5 w-5" />
             </Button>
-            <h1 className="text-lg font-semibold text-slate-800">Panel de control</h1>
           </div>
-          <div className="flex items-center gap-3 text-right text-sm text-slate-600">
-            <div>
-              <p className="font-medium text-slate-800">{user?.displayName ?? 'Equipo Quality'}</p>
-              <p className="capitalize">{role?.toLowerCase() ?? 'sin rol'}</p>
-            </div>
-          </div>
+          <h1 className="text-base font-semibold tracking-tight sm:text-lg">{activeNavigation?.label ?? 'Quality Bordados'}</h1>
+          <Badge variant="neutral" className="text-xs uppercase tracking-wide">
+            {role ?? 'Sin rol'}
+          </Badge>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8">
-          <Outlet />
+        <main className="relative flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-10">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-6">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

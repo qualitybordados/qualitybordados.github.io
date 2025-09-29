@@ -3,18 +3,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ClienteFormFields } from '@/features/clientes/components/cliente-form'
 import { useClientes, useCreateCliente, useDeleteCliente, useUpdateCliente } from '@/features/clientes/hooks'
 import { usePedidos } from '@/features/pedidos/hooks'
 import { Cliente } from '@/lib/types'
 import { formatCurrency, formatPhone } from '@/lib/format'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
-import { Loader2, Plus, Search, Trash } from 'lucide-react'
+import { Mail, Phone, MapPin, CreditCard, Pencil, Search, Filter, Plus, Trash } from 'lucide-react'
+import dayjs from 'dayjs'
 
 const estatusFilters = ['TODOS', 'ACTIVO', 'PAUSADO']
 
@@ -69,28 +69,45 @@ export default function ClientesPage() {
     }
   }
 
+  function openNuevoCliente() {
+    setClienteSeleccionado(null)
+    setModalOpen(true)
+  }
+
+  function openEditarCliente(cliente: Cliente) {
+    setClienteSeleccionado(cliente)
+    setModalOpen(true)
+  }
+
+  function openDetalle(cliente: Cliente) {
+    setClienteSeleccionado(cliente)
+    setDetalleOpen(true)
+  }
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Gestión de clientes</CardTitle>
+    <div className="relative space-y-6 pb-20">
+      <Card className="border-none bg-white/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Clientes</CardTitle>
+          <p className="text-xs text-slate-500">Gestiona tus clientes desde una vista táctil y rápida.</p>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex w-full flex-col gap-2 md:flex-row md:items-center">
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="Buscar por nombre, alias, correo o ciudad"
-                className="pl-9"
+                className="pl-11"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
             <div className="flex items-center gap-2">
+              <Filter className="hidden h-4 w-4 text-slate-400 sm:block" />
               <select
                 value={estatus}
                 onChange={(event) => setEstatus(event.target.value)}
-                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 {estatusFilters.map((option) => (
                   <option key={option} value={option}>
@@ -101,7 +118,7 @@ export default function ClientesPage() {
               <select
                 value={ciudadFiltro}
                 onChange={(event) => setCiudadFiltro(event.target.value)}
-                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Todas las ciudades</option>
                 {ciudades.map((ciudad) => (
@@ -113,113 +130,148 @@ export default function ClientesPage() {
             </div>
           </div>
           {canEdit ? (
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => setClienteSeleccionado(null)}>
-                  <Plus className="mr-2 h-4 w-4" /> Nuevo cliente
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{clienteSeleccionado ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
-                  <DialogDescription>
-                    {clienteSeleccionado
-                      ? 'Actualiza los datos del cliente y guarda los cambios registrados.'
-                      : 'Completa la información para registrar un nuevo cliente en el sistema.'}
-                  </DialogDescription>
-                </DialogHeader>
-                <ClienteFormFields
-                  defaultValues={clienteSeleccionado ?? undefined}
-                  onSubmit={clienteSeleccionado ? handleActualizarCliente : handleCrearCliente}
-                  submitLabel={clienteSeleccionado ? 'Actualizar cliente' : 'Crear cliente'}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button onClick={openNuevoCliente} className="hidden w-full sm:w-auto lg:flex lg:self-end">
+              <Plus className="h-4 w-4" />
+              <span>Nuevo cliente</span>
+            </Button>
           ) : null}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead>Ciudad</TableHead>
-                <TableHead>Límite crédito</TableHead>
-                <TableHead>Estatus</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clientesLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                  </TableCell>
-                </TableRow>
-              ) : clientesFiltrados.length ? (
-                clientesFiltrados.map((cliente) => (
-                  <TableRow key={cliente.id} className="cursor-pointer" onClick={() => { setClienteSeleccionado(cliente); setDetalleOpen(true) }}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-800">{cliente.alias}</span>
-                        <span className="text-xs text-slate-500">{cliente.nombre_legal}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col text-sm">
-                        <span>{cliente.email}</span>
-                        <span className="text-xs text-slate-500">{formatPhone(cliente.telefono)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{cliente.ciudad}</TableCell>
-                    <TableCell>{formatCurrency(cliente.limite_credito)}</TableCell>
-                    <TableCell>
-                      <Badge variant={cliente.estatus === 'ACTIVO' ? 'success' : 'warning'}>
-                        {cliente.estatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setClienteSeleccionado(cliente)
-                          setModalOpen(true)
-                        }}
-                        disabled={!canEdit}
-                      >
-                        Editar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10">
-                    <EmptyState
-                      title="Sin clientes"
-                      description="Agrega tu primer cliente para comenzar a registrar pedidos y cobranza."
-                    />
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        {clientesLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="border-none bg-white/60 p-4 shadow-sm">
+              <div className="flex animate-pulse flex-col gap-3">
+                <div className="h-4 w-32 rounded-full bg-slate-200" />
+                <div className="h-4 w-48 rounded-full bg-slate-200" />
+                <div className="h-10 w-full rounded-full bg-slate-200" />
+              </div>
+            </Card>
+          ))
+        ) : clientesFiltrados.length ? (
+          clientesFiltrados.map((cliente) => (
+            <ClienteCard
+              key={cliente.id}
+              cliente={cliente}
+              onOpenDetalle={() => openDetalle(cliente)}
+              onOpenEditar={() => openEditarCliente(cliente)}
+              canEdit={canEdit}
+            />
+          ))
+        ) : (
+          <EmptyState
+            title="Sin clientes"
+            description="Agrega tu primer cliente para comenzar a registrar pedidos y cobranza."
+          />
+        )}
+      </section>
+
+      {canEdit ? (
+        <Button
+          size="fab"
+          className="fixed bottom-24 right-6 z-40 lg:hidden"
+          onClick={openNuevoCliente}
+          aria-label="Nuevo cliente"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      ) : null}
+
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{clienteSeleccionado ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
+            <DialogDescription>
+              {clienteSeleccionado
+                ? 'Actualiza los datos del cliente y guarda los cambios registrados.'
+                : 'Completa la información para registrar un nuevo cliente en el sistema.'}
+            </DialogDescription>
+          </DialogHeader>
+          <ClienteFormFields
+            defaultValues={clienteSeleccionado ?? undefined}
+            onSubmit={clienteSeleccionado ? handleActualizarCliente : handleCrearCliente}
+            submitLabel={clienteSeleccionado ? 'Actualizar cliente' : 'Crear cliente'}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={detalleOpen} onOpenChange={setDetalleOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl">
           {clienteSeleccionado ? (
             <ClienteDetalle cliente={clienteSeleccionado} puedeEliminar={canEdit} onEliminar={handleEliminarCliente} />
           ) : null}
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function ClienteCard({
+  cliente,
+  onOpenDetalle,
+  onOpenEditar,
+  canEdit,
+}: {
+  cliente: Cliente
+  onOpenDetalle: () => void
+  onOpenEditar: () => void
+  canEdit: boolean
+}) {
+  const estatusColor = cliente.estatus === 'ACTIVO' ? 'success' : 'warning'
+
+  return (
+    <Card
+      className="relative cursor-pointer border-none bg-white/90 p-4 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md"
+      onClick={onOpenDetalle}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-slate-900">{cliente.alias}</span>
+            <Badge variant={estatusColor}>{cliente.estatus}</Badge>
+          </div>
+          <p className="text-sm text-slate-500">{cliente.nombre_legal}</p>
+        </div>
+        {canEdit ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-10 w-10 border border-slate-200"
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpenEditar()
+            }}
+            aria-label="Editar cliente"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 space-y-3 text-sm text-slate-600">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-2 text-slate-600">
+            <Mail className="h-4 w-4 text-slate-400" />
+            {cliente.email}
+          </span>
+          <span className="flex items-center gap-2 text-slate-600">
+            <Phone className="h-4 w-4 text-slate-400" />
+            {formatPhone(cliente.telefono)}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-slate-500">
+          <span className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-slate-400" />
+            {cliente.ciudad}
+          </span>
+          <span className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-slate-400" />
+            {formatCurrency(cliente.limite_credito)} límite
+          </span>
+        </div>
+      </div>
+    </Card>
   )
 }
 
@@ -241,70 +293,46 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
         </DialogHeader>
         {puedeEliminar ? (
           <Button variant="destructive" size="sm" onClick={() => onEliminar(cliente)}>
-            <Trash className="mr-2 h-4 w-4" /> Eliminar
+            <Trash className="h-4 w-4" />
+            <span>Eliminar</span>
           </Button>
         ) : null}
       </div>
 
-      <Tabs defaultValue="datos">
-        <TabsList>
-          <TabsTrigger value="datos">Datos</TabsTrigger>
-          <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
-          <TabsTrigger value="saldos">Saldos</TabsTrigger>
+      <Tabs defaultValue="datos" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 rounded-full bg-slate-100 p-1 text-xs">
+          <TabsTrigger value="datos" className="rounded-full">Datos</TabsTrigger>
+          <TabsTrigger value="pedidos" className="rounded-full">Pedidos</TabsTrigger>
+          <TabsTrigger value="saldos" className="rounded-full">Saldos</TabsTrigger>
         </TabsList>
-        <TabsContent value="datos">
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div>
-              <p className="font-medium text-slate-600">RFC</p>
-              <p>{cliente.rfc}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-600">Correo</p>
-              <p>{cliente.email}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-600">Teléfono</p>
-              <p>{formatPhone(cliente.telefono)}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-600">Ciudad</p>
-              <p>{cliente.ciudad}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="font-medium text-slate-600">Dirección</p>
-              <p>{cliente.direccion}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-600">Límite de crédito</p>
-              <p>{formatCurrency(cliente.limite_credito)}</p>
-            </div>
-            <div>
-              <p className="font-medium text-slate-600">Días de crédito</p>
-              <p>{cliente.dias_credito}</p>
-            </div>
-          </div>
+        <TabsContent value="datos" className="mt-4 space-y-3 text-sm">
+          <InfoRow label="RFC" value={cliente.rfc} />
+          <InfoRow label="Correo" value={cliente.email} />
+          <InfoRow label="Teléfono" value={formatPhone(cliente.telefono)} />
+          <InfoRow label="Ciudad" value={`${cliente.ciudad} · CP ${cliente.cp}`} />
+          <InfoRow label="Dirección" value={cliente.direccion} />
+          <InfoRow label="Límite de crédito" value={formatCurrency(cliente.limite_credito)} />
+          <InfoRow label="Días de crédito" value={`${cliente.dias_credito} días`} />
         </TabsContent>
-        <TabsContent value="pedidos">
+        <TabsContent value="pedidos" className="mt-4 space-y-3">
           {pedidos && pedidos.length ? (
-            <div className="space-y-3">
-              {pedidos.map((pedido) => (
-                <div key={pedido.id} className="rounded-lg border border-slate-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">Folio {pedido.folio}</p>
-                      <p className="text-xs text-slate-500">Estado: {pedido.status}</p>
-                    </div>
-                    <Badge variant={pedido.saldo > 0 ? 'warning' : 'success'}>{formatCurrency(pedido.saldo)}</Badge>
+            pedidos.map((pedido) => (
+              <div key={pedido.id} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Folio {pedido.folio}</p>
+                    <p className="text-xs text-slate-500">Estado: {pedido.status}</p>
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">Entrega: {pedido.fecha_compromiso.toDate().toLocaleDateString()}</p>
+                  <Badge variant={pedido.saldo > 0 ? 'warning' : 'success'}>{formatCurrency(pedido.saldo)}</Badge>
                 </div>
-              ))}
-            </div>
+                <p className="mt-2 text-xs text-slate-500">Entrega: {dayjs(pedido.fecha_compromiso.toDate()).format('DD MMM YYYY')}</p>
+              </div>
+            ))
           ) : (
             <EmptyState title="Sin pedidos" description="Aún no hay pedidos registrados para este cliente." />
           )}
         </TabsContent>
-        <TabsContent value="saldos">
+        <TabsContent value="saldos" className="mt-4">
           <Alert
             variant={saldoTotal > 0 ? 'warning' : 'success'}
             title={saldoTotal > 0 ? 'Saldo pendiente' : 'Cliente al corriente'}
@@ -312,6 +340,15 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
           />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-2xl bg-slate-50 p-3 text-slate-600">
+      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-sm font-medium text-slate-800">{value}</span>
     </div>
   )
 }
