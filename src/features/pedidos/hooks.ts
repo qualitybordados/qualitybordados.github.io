@@ -11,11 +11,16 @@ type PedidosFilters = {
   clienteId?: string
 }
 
-export function usePedidos(filters: PedidosFilters = {}) {
+type PedidosQueryOptions = {
+  enabled?: boolean
+}
+
+export function usePedidos(filters: PedidosFilters = {}, options: PedidosQueryOptions = {}) {
   return useQuery({
     queryKey: [...PEDIDOS_KEY, filters],
     queryFn: () => fetchPedidos(filters),
     staleTime: 1000 * 30,
+    enabled: options.enabled,
   })
 }
 

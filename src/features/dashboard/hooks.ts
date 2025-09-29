@@ -1,10 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchDashboardData } from './api'
 
-export function useDashboardData() {
+type DashboardQueryOptions = {
+  enabled?: boolean
+}
+
+export function useDashboardData(options: DashboardQueryOptions = {}) {
   return useQuery({
     queryKey: ['dashboard'],
     queryFn: fetchDashboardData,
     staleTime: 1000 * 60,
+    enabled: options.enabled,
   })
 }

@@ -4,11 +4,16 @@ import { ConfiguracionForm } from '@/lib/validators'
 
 const CONFIG_KEY = ['configuracion']
 
-export function useConfiguracion() {
+type ConfigQueryOptions = {
+  enabled?: boolean
+}
+
+export function useConfiguracion(options: ConfigQueryOptions = {}) {
   return useQuery({
     queryKey: CONFIG_KEY,
     queryFn: fetchConfiguracion,
     staleTime: 1000 * 60 * 5,
+    enabled: options.enabled,
   })
 }
 

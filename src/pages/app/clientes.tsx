@@ -19,10 +19,16 @@ import { Loader2, Plus, Search, Trash } from 'lucide-react'
 const estatusFilters = ['TODOS', 'ACTIVO', 'PAUSADO']
 
 export default function ClientesPage() {
-  const { role, user } = useAuth()
+  const { role, user, loading } = useAuth()
   const [search, setSearch] = useState('')
   const [estatus, setEstatus] = useState<string>('TODOS')
-  const { data: clientes, isLoading } = useClientes({ search, estatus })
+  const authReady = !!user && !loading
+  const {
+    data: clientes,
+    isLoading,
+    isFetching,
+  } = useClientes({ search, estatus }, { enabled: authReady })
+  const clientesLoading = loading || isLoading || (authReady && isFetching && !clientes)
   const createMutation = useCreateCliente()
   const updateMutation = useUpdateCliente()
   const deleteMutation = useDeleteCliente()
@@ -142,7 +148,7 @@ export default function ClientesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {clientesLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin" />
@@ -213,7 +219,9 @@ export default function ClientesPage() {
 }
 
 function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Cliente; puedeEliminar: boolean; onEliminar: (cliente: Cliente) => void }) {
-  const { data: pedidos } = usePedidos({ clienteId: cliente.id })
+  const { user, loading } = useAuth()
+  const authReady = !!user && !loading
+  const { data: pedidos } = usePedidos({ clienteId: cliente.id }, { enabled: authReady })
   const saldoTotal = useMemo(() => {
     if (!pedidos) return 0
     return pedidos.reduce((sum, pedido) => sum + pedido.saldo, 0)
