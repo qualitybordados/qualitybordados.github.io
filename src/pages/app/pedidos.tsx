@@ -203,7 +203,7 @@ function PedidoCard({
           <User className="h-4 w-4 text-slate-400" />
           {pedido.cliente_id.id}
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-slate-500">
             <Calendar className="h-4 w-4 text-slate-400" />
             {formatDate(fechaCompromiso)}
@@ -214,7 +214,7 @@ function PedidoCard({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
           <DollarSign className="h-4 w-4 text-slate-400" />
           {formatCurrency(pedido.saldo)}

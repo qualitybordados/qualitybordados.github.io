@@ -111,7 +111,7 @@ function CobranzaCard({
       </div>
 
       <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-slate-500">
             <Calendar className="h-4 w-4 text-slate-400" />
             {formatDate(fecha)}
@@ -126,7 +126,7 @@ function CobranzaCard({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-end">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <Button onClick={onRegistrar} disabled={disabled} className="w-full sm:w-auto">
           Registrar abono
         </Button>
