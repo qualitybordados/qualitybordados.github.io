@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { onAuthStateChanged } from 'firebase/auth'
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo } from 'react'
 import { auth } from '@/config/firebase'

@@ -18,3 +18,9 @@ body {
 #root {
   @apply min-h-screen w-full;
 }
+
+html.modal-open,
+body.modal-open {
+  @apply overflow-hidden;
+  touch-action: none;
+}
