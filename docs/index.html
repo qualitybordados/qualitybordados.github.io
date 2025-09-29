@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
     <script>
+      const redirectPath = sessionStorage.getItem('gh-spa-redirect')
+      if (redirectPath) {
+        sessionStorage.removeItem('gh-spa-redirect')
+
+        try {
+          const targetUrl = new URL(redirectPath, window.location.origin)
+          const newPath = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
+          window.history.replaceState(null, '', newPath)
+        } catch (error) {
+          console.warn('[SPA Redirect] Failed to parse redirect path', error)
+          sessionStorage.removeItem('gh-spa-redirect')
+        }
+      }
+    </script>
+    <script>
       const isLocalhost = ['localhost', '127.0.0.1', ''].includes(location.hostname)
       const isDocsPath = location.pathname.includes('/docs/')
       const assetBase = isDocsPath ? './' : './docs/'
