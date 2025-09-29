@@ -9,7 +9,7 @@ import { useClientes, useCreateCliente, useDeleteCliente, useUpdateCliente } fro
 import { usePedidos } from '@/features/pedidos/hooks'
 import { Cliente } from '@/lib/types'
 import { formatCurrency, formatPhone } from '@/lib/format'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { Alert } from '@/components/ui/alert'
@@ -122,6 +122,11 @@ export default function ClientesPage() {
               <DialogContent className="max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{clienteSeleccionado ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
+                  <DialogDescription>
+                    {clienteSeleccionado
+                      ? 'Actualiza los datos del cliente y guarda los cambios registrados.'
+                      : 'Completa la información para registrar un nuevo cliente en el sistema.'}
+                  </DialogDescription>
                 </DialogHeader>
                 <ClienteFormFields
                   defaultValues={clienteSeleccionado ?? undefined}
@@ -230,10 +235,10 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">{cliente.alias}</h2>
-          <p className="text-sm text-slate-500">{cliente.nombre_legal}</p>
-        </div>
+        <DialogHeader className="items-start text-left">
+          <DialogTitle className="text-xl font-semibold text-slate-900">{cliente.alias}</DialogTitle>
+          <DialogDescription>{cliente.nombre_legal}</DialogDescription>
+        </DialogHeader>
         {puedeEliminar ? (
           <Button variant="destructive" size="sm" onClick={() => onEliminar(cliente)}>
             <Trash className="mr-2 h-4 w-4" /> Eliminar

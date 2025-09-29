@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useMovimientosCaja, useCrearMovimientoCaja } from '@/features/caja/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Download, Plus } from 'lucide-react'
@@ -120,6 +120,7 @@ export default function CajaPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Registrar movimiento</DialogTitle>
+                    <DialogDescription>Captura un ingreso o egreso y guarda la referencia en la bitácora.</DialogDescription>
                   </DialogHeader>
                   <MovimientoForm
                     onSubmit={async (values) => {
