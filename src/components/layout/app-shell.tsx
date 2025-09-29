@@ -29,7 +29,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="relative flex min-h-screen bg-slate-100">
+    <div className="relative flex min-h-screen w-full max-w-[100vw] bg-slate-100">
       <div
         className={clsx(
           'fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity lg:hidden',
@@ -96,7 +96,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-72">
+      <div className="flex min-h-screen w-full flex-1 flex-col lg:pl-72">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-primary px-4 text-primary-foreground shadow-sm sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
             <Button

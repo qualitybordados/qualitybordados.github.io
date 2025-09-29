@@ -92,8 +92,8 @@ export default function ClientesPage() {
           <p className="text-xs text-slate-500">Gestiona tus clientes desde una vista táctil y rápida.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="relative w-full sm:flex-1">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="Buscar por nombre, alias, correo o ciudad"
@@ -102,12 +102,12 @@ export default function ClientesPage() {
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
               <Filter className="hidden h-4 w-4 text-slate-400 sm:block" />
               <select
                 value={estatus}
                 onChange={(event) => setEstatus(event.target.value)}
-                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="h-11 w-full rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent sm:w-auto"
               >
                 {estatusFilters.map((option) => (
                   <option key={option} value={option}>
@@ -118,7 +118,7 @@ export default function ClientesPage() {
               <select
                 value={ciudadFiltro}
                 onChange={(event) => setCiudadFiltro(event.target.value)}
-                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="h-11 w-full rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent sm:w-auto"
               >
                 <option value="">Todas las ciudades</option>
                 {ciudades.map((ciudad) => (
@@ -250,7 +250,7 @@ function ClienteCard({
       </div>
 
       <div className="mt-4 space-y-3 text-sm text-slate-600">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-2 text-slate-600 sm:flex-row sm:flex-wrap sm:items-center">
           <span className="flex items-center gap-2 text-slate-600">
             <Mail className="h-4 w-4 text-slate-400" />
             {cliente.email}
@@ -260,12 +260,12 @@ function ClienteCard({
             {formatPhone(cliente.telefono)}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-slate-500">
-          <span className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center">
+          <span className="flex items-center gap-2 text-slate-500">
             <MapPin className="h-4 w-4 text-slate-400" />
             {cliente.ciudad}
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2 text-slate-500">
             <CreditCard className="h-4 w-4 text-slate-400" />
             {formatCurrency(cliente.limite_credito)} límite
           </span>
