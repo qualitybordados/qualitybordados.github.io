@@ -69,6 +69,10 @@ export async function cleanDocs() {
   console.log('🧹 docs/ limpio y .nojekyll regenerado')
 }
 
+function escapeRegExp(input) {
+  return input.replace(/[.*+?^${}()|[\]\]/g, '\\$&')
+}
+
 async function rewriteCssReference(filePath, cssReference) {
   if (!(await pathExists(filePath))) {
     return
@@ -81,21 +85,41 @@ async function rewriteCssReference(filePath, cssReference) {
   }
 }
 
+async function rewriteMainScriptReference(filePath, mainReference) {
+  if (!(await pathExists(filePath))) {
+    return
+  }
+
+  const html = await fs.readFile(filePath, 'utf8')
+  const escapedMain = escapeRegExp(mainReference)
+  const regex = new RegExp(`src=(["'])\\/?${escapedMain}`, 'g')
+  const updatedHtml = html.replace(regex, `src=$1${mainReference}`)
+
+  if (updatedHtml !== html) {
+    await fs.writeFile(filePath, updatedHtml, 'utf8')
+  }
+}
+
 export async function publishDocs() {
   const distPath = paths.dist()
   if (!(await pathExists(distPath))) {
     throw new Error('dist/ no existe. Ejecuta "npm run build" antes de publicar.')
   }
 
+  const mainBundle = await getMainBundleFromDist()
   const cssBundle = await getCssBundleFromDist()
   const cssReference = `assets/${cssBundle}`
+  const mainReference = `assets/${mainBundle}`
+
   await rewriteCssReference(paths.dist('index.html'), cssReference)
+  await rewriteMainScriptReference(paths.dist('index.html'), mainReference)
 
   await safeUnlink(paths.docs())
   await ensureDir(paths.docs())
   await fs.cp(distPath, paths.docs(), { recursive: true })
   await ensureNoJekyll()
   await rewriteCssReference(paths.docs('index.html'), cssReference)
+  await rewriteMainScriptReference(paths.docs('index.html'), mainReference)
   console.log('📤 docs/ sincronizado con dist/')
 }
 
