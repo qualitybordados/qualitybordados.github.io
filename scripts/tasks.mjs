@@ -98,8 +98,7 @@ async function rewriteMainScriptReference(filePath, mainReference) {
   }
 
   const html = await fs.readFile(filePath, 'utf8')
-  const escapedMain = escapeRegExp(mainReference)
-  const regex = new RegExp(`src=(["'])\\/?${escapedMain}`, 'g')
+  const regex = /src=(['\"])\/?assets\/main(?:\.[^'\"]+)?\.js/g
   const updatedHtml = html.replace(regex, `src=$1${mainReference}`)
 
   if (updatedHtml !== html) {
