@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePedidos, useCreatePedido, useActualizarEstadoPedido } from '@/features/pedidos/hooks'
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
@@ -263,6 +263,7 @@ function PedidoWizard({
     <div className="space-y-6">
       <DialogHeader>
         <DialogTitle>Nuevo pedido</DialogTitle>
+        <DialogDescription>Completa los pasos para generar el pedido y calcular los importes finales.</DialogDescription>
       </DialogHeader>
       <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-400">
         <span className={step === 1 ? 'font-semibold text-primary' : ''}>Cliente</span>
@@ -483,6 +484,7 @@ function DetallePedido({ pedido }: { pedido: any }) {
     <div className="space-y-4">
       <DialogHeader>
         <DialogTitle>Detalle pedido {pedido.folio}</DialogTitle>
+        <DialogDescription>Revisa la información general del pedido y su estado actual.</DialogDescription>
       </DialogHeader>
       <div className="grid gap-3 text-sm md:grid-cols-2">
         <div>

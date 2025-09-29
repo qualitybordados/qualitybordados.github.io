@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import dayjs from 'dayjs'
@@ -125,6 +125,7 @@ function AbonoDialogForm({
     <div className="space-y-4">
       <DialogHeader>
         <DialogTitle>Registrar abono — {pedido.folio}</DialogTitle>
+        <DialogDescription>Ingresa el pago recibido y actualiza el saldo pendiente del pedido.</DialogDescription>
       </DialogHeader>
       <div className="space-y-3 text-sm">
         <div>
