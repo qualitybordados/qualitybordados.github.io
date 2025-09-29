@@ -1,28 +1,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasAdminPrivileges() {
+      return isAuthenticated()
+        && (request.auth.token.admin == true
+          || request.auth.token.role in ['OWNER', 'ADMIN']);
+    }
+
     // Public documents readable by anyone
     match /publicContent/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if hasAdminPrivileges();
     }
 
     // Authenticated users can access their own documents
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // Allow authenticated users to create support tickets; only owners and admins can read/update
     match /supportTickets/{ticketId} {
-      allow create: if request.auth != null;
-      allow read, update, delete:
-          if request.auth != null &&
-             (request.auth.uid == resource.data.ownerId || request.auth.token.admin == true);
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated()
+        && (request.auth.uid == resource.data.ownerId || hasAdminPrivileges());
     }
 
     // Default deny; only admins can access other collections
     match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+      allow read, write: if hasAdminPrivileges();
     }
   }
 }
