@@ -186,7 +186,7 @@ function PedidoCard({
       className="relative cursor-pointer border-none bg-white/90 p-4 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <span className="text-sm font-semibold text-slate-900">Folio {pedido.folio}</span>
           <Badge variant={estadoVariant} className="uppercase">
@@ -199,11 +199,11 @@ function PedidoCard({
       </div>
 
       <div className="mt-4 space-y-2 text-sm text-slate-600">
-        <div className="flex items-center gap-2 text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-slate-500">
           <User className="h-4 w-4 text-slate-400" />
           {pedido.cliente_id.id}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-slate-500">
             <Calendar className="h-4 w-4 text-slate-400" />
             {formatDate(fechaCompromiso)}
@@ -214,8 +214,8 @@ function PedidoCard({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-base font-semibold text-slate-900">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
           <DollarSign className="h-4 w-4 text-slate-400" />
           {formatCurrency(pedido.saldo)}
         </div>
@@ -343,14 +343,14 @@ function PedidoWizard({
         <DialogTitle>Nuevo pedido</DialogTitle>
         <DialogDescription>Completa los pasos para generar el pedido y calcular los importes finales.</DialogDescription>
       </DialogHeader>
-      <div className="grid grid-cols-4 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4 sm:text-xs">
         {wizardSteps.map((wizardStep, index) => {
           const isActive = step === wizardStep.id
           return (
             <div
               key={wizardStep.id}
               className={clsx(
-                'flex flex-col items-center gap-1 rounded-full border px-3 py-2 text-center uppercase',
+                'flex w-full flex-col items-center gap-1 rounded-full border px-3 py-2 text-center uppercase',
                 isActive ? 'border-primary bg-primary text-white' : 'border-transparent bg-slate-100 text-slate-500',
               )}
             >
