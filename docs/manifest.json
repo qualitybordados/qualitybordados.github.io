@@ -1,0 +1,20 @@
+{
+  "index.html": {
+    "file": "assets/main.DMYkLxjH.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "src/main.tsx"
+    ]
+  },
+  "src/main.tsx": {
+    "file": "assets/main.-s6rN-Vj.js",
+    "name": "main",
+    "src": "src/main.tsx",
+    "isDynamicEntry": true,
+    "css": [
+      "assets/index.ClNPunjH.css"
+    ]
+  }
+}
