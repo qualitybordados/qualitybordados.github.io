@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20250929-1759">
+<html lang="en" data-build="20250929-1842">
   <head>
     <meta charset="UTF-8" />
     <link id="favicon" rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -34,19 +34,164 @@
       const isDocsPath = location.pathname.includes('/docs/')
       const assetBase = isDocsPath ? './' : './docs/'
 
+      const manifestState = { promise: null }
+      const metaState = { promise: null }
+      let stylesheetPromise = null
+
+      const warnPrefix = '[Assets]'
+
+      const warn = (...messages) => {
+        console.warn(warnPrefix, ...messages)
+      }
+
+      const fetchJson = async (url, options = {}) => {
+        const { quiet = false } = options
+        try {
+          const response = await fetch(url, { cache: 'no-store' })
+          if (!response.ok) {
+            if (!quiet) {
+              warn(`Failed to fetch JSON from ${url}`, `(${response.status})`)
+            }
+            return null
+          }
+          return await response.json()
+        } catch (error) {
+          if (!quiet) {
+            warn(`Error fetching JSON from ${url}`, error)
+          }
+          return null
+        }
+      }
+
+      const loadManifest = async () => {
+        if (isLocalhost) {
+          return null
+        }
+
+        if (!manifestState.promise) {
+          manifestState.promise = (async () => {
+            const candidates = [`${assetBase}.vite/manifest.json`, `${assetBase}manifest.json`]
+            for (const candidate of candidates) {
+              const manifest = await fetchJson(candidate, { quiet: true })
+              if (manifest) {
+                manifestState.url = candidate
+                return manifest
+              }
+            }
+
+            warn('Manifest not found in expected locations')
+            return null
+          })()
+        }
+
+        return manifestState.promise
+      }
+
+      const loadMeta = async () => {
+        if (isLocalhost) {
+          return null
+        }
+
+        if (!metaState.promise) {
+          metaState.promise = fetchJson('/.docs-build-meta.json')
+        }
+
+        return metaState.promise
+      }
+
+      const appendStylesheet = (href) => {
+        if (document.querySelector(`link[data-app-stylesheet="${href}"]`)) {
+          return
+        }
+
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = href
+        link.dataset.appStylesheet = href
+        document.head.appendChild(link)
+      }
+
+      const resolveCssUrls = async () => {
+        if (isLocalhost) {
+          return []
+        }
+
+        const manifest = await loadManifest()
+        const entry = manifest?.['src/main.tsx']
+        if (Array.isArray(entry?.css) && entry.css.length) {
+          return entry.css.map((file) => `${assetBase}${file}`)
+        }
+
+        try {
+          const response = await fetch(`${assetBase}index.html`, { cache: 'no-store' })
+          if (response.ok) {
+            const html = await response.text()
+            const matches = [...html.matchAll(/href=["'](assets\/index\.[^"']+\.css)["']/gi)]
+            if (matches.length) {
+              return matches.map((match) => `${assetBase}${match[1]}`)
+            }
+          } else {
+            warn('Failed to fetch docs index for CSS discovery', `(${response.status})`)
+          }
+        } catch (error) {
+          warn('Error fetching docs index for CSS discovery', error)
+        }
+
+        return [`${assetBase}assets/index.ClNPunjH.css`]
+      }
+
+      const ensureStylesheets = async () => {
+        if (stylesheetPromise) {
+          return stylesheetPromise
+        }
+
+        stylesheetPromise = (async () => {
+          const cssUrls = await resolveCssUrls()
+          cssUrls.forEach((href) => {
+            appendStylesheet(href)
+          })
+        })()
+
+        return stylesheetPromise
+      }
+
+      const resolveMainModule = async () => {
+        if (isLocalhost) {
+          return '/src/main.tsx'
+        }
+
+        const manifest = await loadManifest()
+        const entry = manifest?.['src/main.tsx']
+        if (entry?.file) {
+          return `${assetBase}${entry.file}`
+        }
+
+        const meta = await loadMeta()
+        if (meta?.main) {
+          return `${assetBase}assets/${meta.main}`
+        }
+
+        return `${assetBase}assets/main.js`
+      }
+
+      window.__APP_BOOTSTRAP__ = {
+        isLocalhost,
+        isDocsPath,
+        assetBase,
+        ensureStylesheets,
+        resolveMainModule,
+      }
+
       if (!isLocalhost) {
         const favicon = document.getElementById('favicon')
         if (favicon) {
           favicon.href = `${assetBase}vite.svg`
         }
 
-        const stylesheet = document.createElement('link')
-        stylesheet.rel = 'stylesheet'
-        stylesheet.href = `${assetBase}assets/index.ClNPunjH.css`
-        document.head.appendChild(stylesheet)
+        void ensureStylesheets()
       }
     </script>
-    <script type="module" crossorigin src="assets/main.DCjV3JoR.js"></script>
+    <script type="module" crossorigin src="/assets/main.DMYkLxjH.js"></script>
   </head>
   <body>
     <div id="root"></div>
