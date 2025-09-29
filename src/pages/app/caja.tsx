@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { useMovimientosCaja, useCrearMovimientoCaja } from '@/features/caja/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Download, Plus } from 'lucide-react'
+import { Download, Plus, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import dayjs from 'dayjs'
 import { EmptyState } from '@/components/common/empty-state'
 import { MovimientoCajaForm } from '@/lib/validators'
+import { clsx } from 'clsx'
+import { Badge } from '@/components/ui/badge'
 
 export default function CajaPage() {
   const { user, role, loading } = useAuth()
@@ -74,17 +75,18 @@ export default function CajaPage() {
   const puedeCrear = ['OWNER', 'ADMIN', 'COBRANZA'].includes(role ?? '')
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Movimientos de caja</CardTitle>
+    <div className="relative space-y-6 pb-20">
+      <Card className="border-none bg-white/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Movimientos de caja</CardTitle>
+          <p className="text-xs text-slate-500">Filtra y registra ingresos o egresos con controles optimizados para móvil.</p>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
               Tipo
               <select
-                className="h-10 rounded-md border border-slate-200 bg-white px-3"
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 value={tipoFiltro}
                 onChange={(event) => setTipoFiltro(event.target.value as typeof tipoFiltro)}
               >
@@ -106,108 +108,135 @@ export default function CajaPage() {
               <Input type="date" value={fechaFin} onChange={(event) => setFechaFin(event.target.value)} />
             </label>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={exportarCSV} disabled={!movimientos?.length}>
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="outline" onClick={exportarCSV} disabled={!movimientos?.length} className="w-full sm:w-auto">
+              <Download className="h-4 w-4" />
+              Exportar CSV
             </Button>
             {puedeCrear ? (
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" /> Nuevo movimiento
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Registrar movimiento</DialogTitle>
-                    <DialogDescription>Captura un ingreso o egreso y guarda la referencia en la bitácora.</DialogDescription>
-                  </DialogHeader>
-                  <MovimientoForm
-                    onSubmit={async (values) => {
-                      if (!user) return
-                      await crearMovimiento.mutateAsync({ data: values, usuarioId: user.uid })
-                      setDialogOpen(false)
-                    }}
-                    onCancel={() => setDialogOpen(false)}
-                    isSubmitting={crearMovimiento.isPending}
-                  />
-                </DialogContent>
-              </Dialog>
+              <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
+                Nuevo movimiento
+              </Button>
             ) : null}
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Ingresos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-emerald-600">{formatCurrency(totales.ingreso)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Egresos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-red-600">{formatCurrency(totales.egreso)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Neto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-slate-800">{formatCurrency(totales.neto)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Referencia pedido</TableHead>
-                <TableHead>Notas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingMovimientos ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                  </TableCell>
-                </TableRow>
-              ) : movimientos && movimientos.length ? (
-                movimientos.map((movimiento) => (
-                  <TableRow key={movimiento.id}>
-                    <TableCell>{formatDate(movimiento.fecha.toDate())}</TableCell>
-                    <TableCell>{movimiento.tipo}</TableCell>
-                    <TableCell>{movimiento.categoria}</TableCell>
-                    <TableCell>{formatCurrency(movimiento.monto)}</TableCell>
-                    <TableCell>{movimiento.referencia_pedido_id?.id ?? '-'}</TableCell>
-                    <TableCell>{movimiento.notas || '-'}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10">
-                    <EmptyState title="Sin movimientos" description="Registra un ingreso o egreso para comenzar." />
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+      <Card className="border-none bg-gradient-to-r from-emerald-50 via-white to-sky-50 shadow-sm">
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <ResumenItem titulo="Ingresos" valor={formatCurrency(totales.ingreso)} icon={ArrowUpCircle} tono="success" />
+          <ResumenItem titulo="Egresos" valor={formatCurrency(totales.egreso)} icon={ArrowDownCircle} tono="warning" />
+          <ResumenItem titulo="Balance neto" valor={formatCurrency(totales.neto)} icon={ArrowUpCircle} tono="neutral" />
         </CardContent>
       </Card>
+
+      <section className="space-y-3">
+        {loadingMovimientos ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index} className="border-none bg-white/60 p-4 shadow-sm">
+              <div className="flex animate-pulse flex-col gap-3">
+                <div className="h-4 w-24 rounded-full bg-slate-200" />
+                <div className="h-4 w-40 rounded-full bg-slate-200" />
+              </div>
+            </Card>
+          ))
+        ) : movimientos && movimientos.length ? (
+          movimientos.map((movimiento) => (
+            <MovimientoCard key={movimiento.id} movimiento={movimiento} />
+          ))
+        ) : (
+          <EmptyState title="Sin movimientos" description="Registra un ingreso o egreso para comenzar." />
+        )}
+      </section>
+
+      {puedeCrear ? (
+        <Button
+          size="fab"
+          className="fixed bottom-24 right-6 z-40 sm:hidden"
+          onClick={() => setDialogOpen(true)}
+          aria-label="Nuevo movimiento"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      ) : null}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Registrar movimiento</DialogTitle>
+            <DialogDescription>Captura un ingreso o egreso y guarda la referencia en la bitácora.</DialogDescription>
+          </DialogHeader>
+          <MovimientoForm
+            onSubmit={async (values) => {
+              if (!user) return
+              await crearMovimiento.mutateAsync({ data: values, usuarioId: user.uid })
+              setDialogOpen(false)
+            }}
+            onCancel={() => setDialogOpen(false)}
+            isSubmitting={crearMovimiento.isPending}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+function ResumenItem({
+  titulo,
+  valor,
+  icon: Icon,
+  tono,
+}: {
+  titulo: string
+  valor: string
+  icon: typeof ArrowUpCircle
+  tono: 'success' | 'warning' | 'neutral'
+}) {
+  const toneClasses =
+    tono === 'success'
+      ? 'bg-emerald-100 text-emerald-600'
+      : tono === 'warning'
+        ? 'bg-red-100 text-red-600'
+        : 'bg-slate-100 text-slate-600'
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-4 shadow-sm">
+      <span className={clsx('flex h-10 w-10 items-center justify-center rounded-full', toneClasses)}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="flex flex-col">
+        <span className="text-xs uppercase tracking-wide text-slate-500">{titulo}</span>
+        <span className="text-lg font-semibold text-slate-900">{valor}</span>
+      </div>
+    </div>
+  )
+}
+
+function MovimientoCard({ movimiento }: { movimiento: any }) {
+  const esIngreso = movimiento.tipo === 'INGRESO'
+  const tipoBadge = esIngreso ? 'success' : 'warning'
+
+  return (
+    <Card className="border-none bg-white/90 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <Badge variant={tipoBadge} className="uppercase">
+            {movimiento.tipo}
+          </Badge>
+          <span className="text-2xl font-semibold text-slate-900">{formatCurrency(movimiento.monto)}</span>
+          <span className="text-xs uppercase tracking-wide text-slate-400">{movimiento.categoria || 'Sin categoría'}</span>
+        </div>
+        <span className="text-xs text-slate-500">{formatDate(movimiento.fecha.toDate())}</span>
+      </div>
+      <div className="mt-3 space-y-2 text-sm text-slate-600">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-slate-700">Referencia</span>
+          <span className="text-xs text-slate-500">{movimiento.referencia_pedido_id?.id ?? 'N/A'}</span>
+        </div>
+        <p className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">{movimiento.notas || 'Sin notas adicionales.'}</p>
+      </div>
+    </Card>
   )
 }
 
@@ -236,7 +265,7 @@ function MovimientoForm({
       <label className="flex flex-col gap-1 text-sm">
         Tipo
         <select
-          className="h-10 rounded-md border border-slate-200 bg-white px-3"
+          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           value={tipo}
           onChange={(event) => setTipo(event.target.value as 'INGRESO' | 'EGRESO')}
         >
