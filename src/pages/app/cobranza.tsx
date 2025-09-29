@@ -17,9 +17,11 @@ import { AbonoForm as AbonoFormValues } from '@/lib/validators'
 const metodosPago = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] as const
 
 export default function CobranzaPage() {
-  const { data: pedidos, isLoading } = usePedidosConSaldo()
+  const { user, role, loading } = useAuth()
+  const authReady = !!user && !loading
+  const { data: pedidos, isLoading, isFetching } = usePedidosConSaldo({ enabled: authReady })
+  const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const registrarAbono = useRegistrarAbono()
-  const { user, role } = useAuth()
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null)
 
   const puedeRegistrar = ['OWNER', 'ADMIN', 'COBRANZA'].includes(role ?? '')
@@ -43,7 +45,7 @@ export default function CobranzaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {pedidosLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin" />

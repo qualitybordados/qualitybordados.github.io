@@ -11,11 +11,16 @@ type CajaFilters = {
   hasta?: Date
 }
 
-export function useMovimientosCaja(filters: CajaFilters = {}) {
+type CajaQueryOptions = {
+  enabled?: boolean
+}
+
+export function useMovimientosCaja(filters: CajaFilters = {}, options: CajaQueryOptions = {}) {
   return useQuery({
     queryKey: [...CAJA_KEY, filters],
     queryFn: () => fetchMovimientosCaja(filters),
     staleTime: 1000 * 30,
+    enabled: options.enabled,
   })
 }
 

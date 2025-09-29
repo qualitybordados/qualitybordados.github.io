@@ -10,11 +10,16 @@ type ClientesFilters = {
   estatus?: string
 }
 
-export function useClientes(filters: ClientesFilters = {}) {
+type ClientesQueryOptions = {
+  enabled?: boolean
+}
+
+export function useClientes(filters: ClientesFilters = {}, options: ClientesQueryOptions = {}) {
   return useQuery({
     queryKey: [...CLIENTES_KEY, filters],
     queryFn: () => fetchClientes(filters),
     staleTime: 1000 * 60,
+    enabled: options.enabled,
   })
 }
 

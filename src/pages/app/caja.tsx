@@ -14,18 +14,29 @@ import { EmptyState } from '@/components/common/empty-state'
 import { MovimientoCajaForm } from '@/lib/validators'
 
 export default function CajaPage() {
-  const { user, role } = useAuth()
+  const { user, role, loading } = useAuth()
   const [tipoFiltro, setTipoFiltro] = useState<'INGRESO' | 'EGRESO' | 'TODOS'>('TODOS')
   const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [fechaInicio, setFechaInicio] = useState(dayjs().subtract(7, 'day').format('YYYY-MM-DD'))
   const [fechaFin, setFechaFin] = useState(dayjs().format('YYYY-MM-DD'))
 
-  const { data: movimientos, isLoading } = useMovimientosCaja({
-    tipo: tipoFiltro,
-    categoria: categoriaFiltro || undefined,
-    desde: dayjs(fechaInicio).toDate(),
-    hasta: dayjs(fechaFin).toDate(),
-  })
+  const authReady = !!user && !loading
+
+  const {
+    data: movimientos,
+    isLoading,
+    isFetching,
+  } = useMovimientosCaja(
+    {
+      tipo: tipoFiltro,
+      categoria: categoriaFiltro || undefined,
+      desde: dayjs(fechaInicio).toDate(),
+      hasta: dayjs(fechaFin).toDate(),
+    },
+    { enabled: authReady },
+  )
+
+  const loadingMovimientos = loading || isLoading || (authReady && isFetching && !movimientos)
 
   const crearMovimiento = useCrearMovimientoCaja()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -167,7 +178,7 @@ export default function CajaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {loadingMovimientos ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin" />

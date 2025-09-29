@@ -4,11 +4,16 @@ import { AbonoForm } from '@/lib/validators'
 
 const COBRANZA_KEY = ['cobranza']
 
-export function usePedidosConSaldo() {
+type CobranzaQueryOptions = {
+  enabled?: boolean
+}
+
+export function usePedidosConSaldo(options: CobranzaQueryOptions = {}) {
   return useQuery({
     queryKey: COBRANZA_KEY,
     queryFn: fetchPedidosConSaldo,
     staleTime: 1000 * 30,
+    enabled: options.enabled,
   })
 }
 

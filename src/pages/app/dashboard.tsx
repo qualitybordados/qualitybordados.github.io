@@ -4,11 +4,15 @@ import { formatCurrency, formatDate } from '@/lib/format'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function DashboardPage() {
-  const { data, isLoading, isError } = useDashboardData()
+  const { user, loading } = useAuth()
+  const authReady = !!user && !loading
+  const { data, isLoading, isFetching, isError } = useDashboardData({ enabled: authReady })
+  const dashboardLoading = loading || isLoading || (authReady && isFetching && !data)
 
-  if (isLoading) {
+  if (dashboardLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
@@ -25,7 +29,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (isError || !data) {
+  if ((isError && authReady) || !data) {
     return <Alert variant="destructive" title="No fue posible cargar el tablero" description="Reintenta en unos segundos." />
   }
 

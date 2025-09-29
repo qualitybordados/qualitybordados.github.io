@@ -33,12 +33,18 @@ const estadosPedido: PedidoEstado[] = [
 const prioridades: Prioridad[] = ['BAJA', 'MEDIA', 'ALTA']
 
 export default function PedidosPage() {
-  const { user, role } = useAuth()
-  const { data: pedidos, isLoading } = usePedidos()
+  const { user, role, loading } = useAuth()
+  const authReady = !!user && !loading
+  const {
+    data: pedidos,
+    isLoading,
+    isFetching,
+  } = usePedidos({}, { enabled: authReady })
+  const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const createPedido = useCreatePedido()
   const actualizarEstado = useActualizarEstadoPedido()
-  const { data: clientesData } = useClientes()
-  const { data: config } = useConfiguracion()
+  const { data: clientesData } = useClientes({}, { enabled: authReady })
+  const { data: config } = useConfiguracion({ enabled: authReady })
 
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<any | null>(null)
@@ -99,7 +105,7 @@ export default function PedidosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {pedidosLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-10 text-center">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-500" />

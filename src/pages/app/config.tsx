@@ -15,8 +15,10 @@ import { Loader2 } from 'lucide-react'
 const roles = ['OWNER', 'ADMIN', 'VENTAS', 'PRODUCCION', 'COBRANZA'] as const
 
 export default function ConfiguracionPage() {
-  const { role, user } = useAuth()
-  const { data, isLoading } = useConfiguracion()
+  const { role, user, loading } = useAuth()
+  const authReady = !!user && !loading
+  const { data, isLoading, isFetching } = useConfiguracion({ enabled: authReady })
+  const configuracionLoading = loading || isLoading || (authReady && isFetching && !data)
   const guardarConfiguracion = useGuardarConfiguracion()
 
   const form = useForm<ConfiguracionForm>({
@@ -42,7 +44,7 @@ export default function ConfiguracionPage() {
     await guardarConfiguracion.mutateAsync({ data: values, usuarioId: user.uid })
   }
 
-  if (isLoading) {
+  if (configuracionLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin" />
