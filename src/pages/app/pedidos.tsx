@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { usePedidos, useCreatePedido, useActualizarEstadoPedido } from '@/features/pedidos/hooks'
+import { usePedidos, useCreatePedido, useActualizarEstadoPedido, useUpdatePedido, useEliminarPedido } from '@/features/pedidos/hooks'
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
 import { useAuth } from '@/hooks/use-auth'
@@ -20,12 +20,13 @@ import { formatCurrency, formatDate } from '@/lib/format'
 import { Cliente, Pedido, PedidoEstado, Prioridad } from '@/lib/types'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
-import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight } from 'lucide-react'
+import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight, Pencil, Trash } from 'lucide-react'
 import dayjs from 'dayjs'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { PedidoForm, PedidoItemForm } from '@/lib/validators'
 import { clsx } from 'clsx'
+import { PedidoQuickActionsDialog } from '@/features/pedidos/components/pedido-quick-actions-dialog'
 
 const estadosPedido: PedidoEstado[] = [
   'COTIZACIÓN',
@@ -64,18 +65,38 @@ export default function PedidosPage() {
   const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const createPedido = useCreatePedido()
   const actualizarEstado = useActualizarEstadoPedido()
+  const updatePedido = useUpdatePedido()
+  const eliminarPedido = useEliminarPedido()
   const { data: clientesData } = useClientes({}, { enabled: authReady })
   const { data: config } = useConfiguracion({ enabled: authReady })
 
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null)
+  const [pedidoEdicion, setPedidoEdicion] = useState<Pedido | null>(null)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
 
   const puedeCrear = ['OWNER', 'ADMIN', 'VENTAS'].includes(role ?? '')
   const puedeActualizarEstado = ['OWNER', 'ADMIN', 'PRODUCCION'].includes(role ?? '')
+  const puedeEditar = puedeCrear
 
   async function handleCambioEstado(pedidoId: string, estado: PedidoEstado) {
     if (!user) return
     await actualizarEstado.mutateAsync({ id: pedidoId, estado, usuarioId: user.uid })
+  }
+
+  function abrirEdicion(pedido: Pedido) {
+    setPedidoEdicion(pedido)
+    setQuickActionsOpen(true)
+  }
+
+  async function handleEliminarPedido(pedido: Pedido) {
+    if (!user) return
+    if (confirm(`¿Eliminar el pedido ${pedido.folio}?`)) {
+      await eliminarPedido.mutateAsync({ id: pedido.id, usuarioId: user.uid })
+      if (detallePedido?.id === pedido.id) {
+        setDetallePedido(null)
+      }
+    }
   }
 
   return (
@@ -121,6 +142,9 @@ export default function PedidosPage() {
                 onAvanzar={siguienteEstado ? () => handleCambioEstado(pedido.id, siguienteEstado) : undefined}
                 puedeAvanzar={!!siguienteEstado && puedeActualizarEstado}
                 avanzando={actualizarEstado.isPending}
+                onEdit={() => abrirEdicion(pedido)}
+                onDelete={() => handleEliminarPedido(pedido)}
+                allowActions={puedeEditar}
               />
             )
           })
@@ -169,6 +193,36 @@ export default function PedidosPage() {
           {detallePedido ? <DetallePedido pedido={detallePedido} onClose={() => setDetallePedido(null)} /> : null}
         </DialogContent>
       </Dialog>
+
+      <PedidoQuickActionsDialog
+        open={quickActionsOpen && !!pedidoEdicion}
+        pedido={pedidoEdicion}
+        onOpenChange={(open) => {
+          setQuickActionsOpen(open)
+          if (!open) {
+            setPedidoEdicion(null)
+          }
+        }}
+        onSubmit={async (values) => {
+          if (!user || !pedidoEdicion) return
+          await updatePedido.mutateAsync({ id: pedidoEdicion.id, data: values, usuarioId: user.uid })
+          setQuickActionsOpen(false)
+          setPedidoEdicion(null)
+        }}
+        onDelete={
+          puedeEditar
+            ? async () => {
+                if (!pedidoEdicion) return
+                await handleEliminarPedido(pedidoEdicion)
+                setQuickActionsOpen(false)
+                setPedidoEdicion(null)
+              }
+            : undefined
+        }
+        isSubmitting={updatePedido.isPending}
+        isDeleting={eliminarPedido.isPending}
+        allowDelete={puedeEditar}
+      />
     </div>
   )
 }
@@ -179,12 +233,18 @@ function PedidoCard({
   onAvanzar,
   puedeAvanzar,
   avanzando,
+  onEdit,
+  onDelete,
+  allowActions,
 }: {
   pedido: Pedido
   onClick: () => void
   onAvanzar?: () => void
   puedeAvanzar: boolean
   avanzando: boolean
+  onEdit: () => void
+  onDelete: () => void
+  allowActions: boolean
 }) {
   const fechaCompromiso = pedido.fecha_compromiso.toDate()
   const diasRestantes = dayjs(fechaCompromiso).diff(dayjs(), 'day')
@@ -203,9 +263,39 @@ function PedidoCard({
             {pedido.status.replace(/_/g, ' ')}
           </Badge>
         </div>
-        <Badge variant={prioridadVariant} className="text-xs uppercase">
-          {pedido.prioridad}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={prioridadVariant} className="text-xs uppercase">
+            {pedido.prioridad}
+          </Badge>
+          {allowActions ? (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onEdit()
+                }}
+                aria-label="Editar pedido"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200 text-destructive"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onDelete()
+                }}
+                aria-label="Eliminar pedido"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 space-y-2 text-sm text-slate-600">
