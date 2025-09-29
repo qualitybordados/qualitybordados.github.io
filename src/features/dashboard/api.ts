@@ -6,6 +6,37 @@ import dayjs from 'dayjs'
 const pedidosRef = collection(db, 'pedidos')
 const movimientosRef = collection(db, 'movimientos_caja')
 
+function normalizeToDate(value: unknown): Date | null {
+  if (value instanceof Timestamp) {
+    return value.toDate()
+  }
+
+  if (value instanceof Date) {
+    return value
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = dayjs(value)
+    if (parsed.isValid()) {
+      return parsed.toDate()
+    }
+  }
+
+  return null
+}
+
+function extractClienteId(value: unknown): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (value && typeof value === 'object' && 'id' in value && typeof (value as { id: unknown }).id === 'string') {
+    return (value as { id: string }).id
+  }
+
+  return ''
+}
+
 export async function fetchDashboardData() {
   const now = dayjs()
   const tresDias = now.add(3, 'day').toDate()
@@ -20,16 +51,30 @@ export async function fetchDashboardData() {
     query(pedidosRef, where('status', 'in', estadosActivos), where('fecha_compromiso', '<=', Timestamp.fromDate(tresDias))),
   )
   const entregasProximas = proximasEntregasSnap.size
-  const proximasEntregas = proximasEntregasSnap.docs.map((docSnap) => {
-    const data = docSnap.data() as Omit<Pedido, 'id'>
-    return {
-      id: docSnap.id,
-      folio: data.folio,
-      cliente: data.cliente_id.id,
-      fecha_compromiso: data.fecha_compromiso.toDate(),
-      status: data.status,
-    }
-  })
+  const proximasEntregas = proximasEntregasSnap.docs
+    .map((docSnap) => {
+      const data = docSnap.data() as Omit<Pedido, 'id'>
+      const fechaCompromiso = normalizeToDate(data.fecha_compromiso as unknown)
+
+      if (!fechaCompromiso) {
+        return null
+      }
+
+      return {
+        id: docSnap.id,
+        folio: data.folio,
+        cliente: extractClienteId(data.cliente_id as unknown),
+        fecha_compromiso: fechaCompromiso,
+        status: data.status,
+      }
+    })
+    .filter((pedido): pedido is {
+      id: string
+      folio: string
+      cliente: string
+      fecha_compromiso: Date
+      status: Pedido['status']
+    } => pedido !== null)
 
   const carteraVencidaSnap = await getDocs(
     query(pedidosRef, where('saldo', '>', 0), where('fecha_compromiso', '<', Timestamp.fromDate(now.toDate()))),
