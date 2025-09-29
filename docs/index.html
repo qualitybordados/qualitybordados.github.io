@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20250929-2035">
+<html lang="en" data-build="20250929-2052">
   <head>
     <meta charset="UTF-8" />
     <link id="favicon" rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -70,7 +70,7 @@
 
         if (!manifestState.promise) {
           manifestState.promise = (async () => {
-            const candidates = [`${assetBase}.vite/manifest.json`, `${assetBase}manifest.json`]
+            const candidates = [`${assetBase}manifest.json`, `${assetBase}.vite/manifest.json`]
             for (const candidate of candidates) {
               const manifest = await fetchJson(candidate, { quiet: true })
               if (manifest) {
@@ -95,9 +95,10 @@
         if (!metaState.promise) {
           metaState.promise = (async () => {
             const candidates = [
-              '/.docs-build-meta.json',
-              `${assetBase}.docs-build-meta.json`,
               `${assetBase}docs-build-meta.json`,
+              `${assetBase}.docs-build-meta.json`,
+              '/docs-build-meta.json',
+              '/.docs-build-meta.json',
             ]
 
             for (const candidate of candidates) {
