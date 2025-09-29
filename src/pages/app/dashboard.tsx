@@ -73,8 +73,8 @@ export default function DashboardPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Visión general</h2>
-        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible">
-          <Card className="min-w-[85%] snap-center sm:min-w-0">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="w-full">
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Pedidos por estado</CardTitle>
             </CardHeader>
@@ -95,7 +95,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="min-w-[85%] snap-center sm:min-w-0">
+          <Card className="w-full">
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Flujo de caja 7 días</CardTitle>
             </CardHeader>
