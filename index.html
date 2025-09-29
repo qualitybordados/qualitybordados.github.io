@@ -12,8 +12,17 @@
 
         try {
           const targetUrl = new URL(redirectPath, window.location.origin)
-          const newPath = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
-          window.history.replaceState(null, '', newPath)
+          const hasExplicitHash = targetUrl.hash && targetUrl.hash !== '#'
+          const normalizedPath = targetUrl.pathname.replace(/^\//, '')
+          const pathWithSearch = `${normalizedPath}${targetUrl.search}`
+          const nextHash = hasExplicitHash
+            ? targetUrl.hash.replace(/^#/, '')
+            : pathWithSearch
+
+          if (nextHash) {
+            const hashWithLeadingSlash = nextHash.startsWith('/') ? nextHash : `/${nextHash}`
+            window.location.hash = hashWithLeadingSlash
+          }
         } catch (error) {
           console.warn('[SPA Redirect] Failed to parse redirect path', error)
           sessionStorage.removeItem('gh-spa-redirect')
