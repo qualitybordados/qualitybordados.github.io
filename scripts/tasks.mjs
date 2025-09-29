@@ -20,6 +20,8 @@ const MAIN_SRC_REGEX = /src=["']\/?assets\/(main\.[A-Za-z0-9]+\.js)["']/
 const CSS_REGEX = /^index\.[a-z0-9]+\.css$/i
 const CSS_HREF_REGEX = /assets\/(index\.[A-Za-z0-9]+\.css)/
 
+let cachedFirebaseConfig = null
+
 function stampToDate(stamp) {
   if (!stamp) {
     return null
@@ -63,6 +65,11 @@ function logSuccess(prefix, mainFile, dataBuild) {
 }
 
 export async function cleanDocs() {
+  const firebaseConfigPath = paths.docs('firebase-config.js')
+  if (await pathExists(firebaseConfigPath)) {
+    cachedFirebaseConfig = await fs.readFile(firebaseConfigPath, 'utf8')
+  }
+
   await safeUnlink(paths.docs())
   await ensureDir(paths.docs())
   await ensureNoJekyll()
@@ -100,10 +107,55 @@ async function rewriteMainScriptReference(filePath, mainReference) {
   }
 }
 
+async function copyFileIfExists(sourcePath, targetPath) {
+  if (!(await pathExists(sourcePath))) {
+    return false
+  }
+
+  await ensureDir(path.dirname(targetPath))
+  await fs.copyFile(sourcePath, targetPath)
+  return true
+}
+
+async function syncDocsManifest() {
+  const manifestSource = paths.docs(path.join('.vite', 'manifest.json'))
+  const manifestTarget = paths.docs('manifest.json')
+  await copyFileIfExists(manifestSource, manifestTarget)
+}
+
+async function syncDocsMeta() {
+  const metaSource = paths.meta()
+  if (!(await pathExists(metaSource))) {
+    return false
+  }
+
+  const targets = [
+    paths.docs('.docs-build-meta.json'),
+    paths.docs('docs-build-meta.json'),
+  ]
+
+  await Promise.all(
+    targets.map(async (target) => {
+      await ensureDir(path.dirname(target))
+      await fs.copyFile(metaSource, target)
+    }),
+  )
+
+  return true
+}
+
 export async function publishDocs() {
   const distPath = paths.dist()
   if (!(await pathExists(distPath))) {
     throw new Error('dist/ no existe. Ejecuta "npm run build" antes de publicar.')
+  }
+
+  const firebaseConfigPath = paths.docs('firebase-config.js')
+  let firebaseConfig = null
+  if (await pathExists(firebaseConfigPath)) {
+    firebaseConfig = await fs.readFile(firebaseConfigPath, 'utf8')
+  } else if (cachedFirebaseConfig) {
+    firebaseConfig = cachedFirebaseConfig
   }
 
   const mainBundle = await getMainBundleFromDist()
@@ -120,6 +172,12 @@ export async function publishDocs() {
   await ensureNoJekyll()
   await rewriteCssReference(paths.docs('index.html'), cssReference)
   await rewriteMainScriptReference(paths.docs('index.html'), mainReference)
+  if (firebaseConfig) {
+    await fs.writeFile(paths.docs('firebase-config.js'), firebaseConfig, 'utf8')
+  }
+  cachedFirebaseConfig = firebaseConfig
+  await syncDocsManifest()
+  await syncDocsMeta()
   console.log('📤 docs/ sincronizado con dist/')
 }
 
@@ -332,6 +390,7 @@ export async function versionBust() {
   }
 
   await writeJson(paths.meta(), updatedMeta)
+  await syncDocsMeta()
 
   const serviceWorkers = await updateServiceWorker(stamp)
 

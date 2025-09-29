@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20250929-1842">
+<html lang="en" data-build="20250929-1921">
   <head>
     <meta charset="UTF-8" />
     <link id="favicon" rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -93,7 +93,24 @@
         }
 
         if (!metaState.promise) {
-          metaState.promise = fetchJson('/.docs-build-meta.json')
+          metaState.promise = (async () => {
+            const candidates = [
+              '/.docs-build-meta.json',
+              `${assetBase}.docs-build-meta.json`,
+              `${assetBase}docs-build-meta.json`,
+            ]
+
+            for (const candidate of candidates) {
+              const meta = await fetchJson(candidate, { quiet: true })
+              if (meta) {
+                metaState.url = candidate
+                return meta
+              }
+            }
+
+            warn('Build metadata not found in expected locations')
+            return null
+          })()
         }
 
         return metaState.promise
