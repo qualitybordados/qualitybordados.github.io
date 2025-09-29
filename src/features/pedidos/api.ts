@@ -2,7 +2,7 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy,
 import { db } from '@/config/firebase'
 import { Pedido, PedidoEstado, ProduccionEvento } from '@/lib/types'
 import { PedidoForm } from '@/lib/validators'
-import { pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
+import { movimientosCajaCollection, pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
 
 const pedidosRef = collection(db, 'pedidos')
 
@@ -70,6 +70,29 @@ export async function createPedido(values: PedidoForm, usuarioId: string) {
     })
   })
   await batch.commit()
+
+  if (values.anticipo > 0) {
+    const movimientoPayload = {
+      fecha: Timestamp.fromDate(values.fecha_pedido),
+      tipo: 'INGRESO' as const,
+      categoria: 'ANTICIPO',
+      monto: values.anticipo,
+      referencia_pedido_id: pedidoDoc,
+      notas: 'Anticipo registrado al crear pedido',
+      registrado_por: usuarioId,
+      creado_en: serverTimestamp(),
+    }
+
+    const movimientoDoc = await addDoc(movimientosCajaCollection, movimientoPayload)
+
+    await registrarBitacora({
+      entidad: 'movimientos_caja',
+      entidad_id: movimientoDoc.id,
+      accion: 'CREAR',
+      usuario: usuarioId,
+      datos: movimientoPayload,
+    })
+  }
 
   await registrarBitacora({
     entidad: 'pedidos',
