@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePedidosConSaldo, useRegistrarAbono } from '@/features/cobranza/hooks'
+import { useEliminarPedido, useUpdatePedido } from '@/features/pedidos/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
@@ -18,10 +19,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import dayjs from 'dayjs'
-import { Calendar, User, AlertTriangle } from 'lucide-react'
+import { Calendar, User, AlertTriangle, Pencil, Trash } from 'lucide-react'
 import { EmptyState } from '@/components/common/empty-state'
 import { AbonoForm as AbonoFormValues } from '@/lib/validators'
 import { Pedido } from '@/lib/types'
+import { PedidoQuickActionsDialog } from '@/features/pedidos/components/pedido-quick-actions-dialog'
 
 const metodosPago = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] as const
 
@@ -32,8 +34,27 @@ export default function CobranzaPage() {
   const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const registrarAbono = useRegistrarAbono()
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<Pedido | null>(null)
+  const updatePedido = useUpdatePedido()
+  const eliminarPedido = useEliminarPedido()
+  const [pedidoEdicion, setPedidoEdicion] = useState<Pedido | null>(null)
+  const [accionesOpen, setAccionesOpen] = useState(false)
 
   const puedeRegistrar = ['OWNER', 'ADMIN', 'COBRANZA'].includes(role ?? '')
+
+  function abrirEdicionPedido(pedido: Pedido) {
+    setPedidoEdicion(pedido)
+    setAccionesOpen(true)
+  }
+
+  async function handleEliminarPedido(pedido: Pedido) {
+    if (!user) return
+    if (confirm(`¿Eliminar el pedido ${pedido.folio}?`)) {
+      await eliminarPedido.mutateAsync({ id: pedido.id, usuarioId: user.uid })
+      if (pedidoSeleccionado?.id === pedido.id) {
+        setPedidoSeleccionado(null)
+      }
+    }
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -65,6 +86,9 @@ export default function CobranzaPage() {
               pedido={pedido}
               onRegistrar={() => setPedidoSeleccionado(pedido)}
               disabled={!puedeRegistrar}
+              onEdit={() => abrirEdicionPedido(pedido)}
+              onDelete={() => handleEliminarPedido(pedido)}
+              allowActions={puedeRegistrar}
             />
           ))
         ) : (
@@ -88,6 +112,36 @@ export default function CobranzaPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <PedidoQuickActionsDialog
+        open={accionesOpen && !!pedidoEdicion}
+        pedido={pedidoEdicion}
+        onOpenChange={(open) => {
+          setAccionesOpen(open)
+          if (!open) {
+            setPedidoEdicion(null)
+          }
+        }}
+        onSubmit={async (values) => {
+          if (!user || !pedidoEdicion) return
+          await updatePedido.mutateAsync({ id: pedidoEdicion.id, data: values, usuarioId: user.uid })
+          setAccionesOpen(false)
+          setPedidoEdicion(null)
+        }}
+        onDelete={
+          puedeRegistrar
+            ? async () => {
+                if (!pedidoEdicion) return
+                await handleEliminarPedido(pedidoEdicion)
+                setAccionesOpen(false)
+                setPedidoEdicion(null)
+              }
+            : undefined
+        }
+        isSubmitting={updatePedido.isPending}
+        isDeleting={eliminarPedido.isPending}
+        allowDelete={puedeRegistrar}
+      />
     </div>
   )
 }
@@ -96,10 +150,16 @@ function CobranzaCard({
   pedido,
   onRegistrar,
   disabled,
+  onEdit,
+  onDelete,
+  allowActions,
 }: {
   pedido: Pedido
   onRegistrar: () => void
   disabled: boolean
+  onEdit: () => void
+  onDelete: () => void
+  allowActions: boolean
 }) {
   const fecha = pedido.fecha_compromiso.toDate()
   const diasVencidos = dayjs().diff(fecha, 'day')
@@ -115,9 +175,33 @@ function CobranzaCard({
             {pedido.cliente_id.id}
           </div>
         </div>
-        <Badge variant={pedido.status === 'CERRADO' ? 'success' : 'warning'} className="uppercase">
-          {pedido.status.replace(/_/g, ' ')}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={pedido.status === 'CERRADO' ? 'success' : 'warning'} className="uppercase">
+            {pedido.status.replace(/_/g, ' ')}
+          </Badge>
+          {allowActions ? (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 border border-slate-200"
+                onClick={onEdit}
+                aria-label="Editar pedido"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 border border-slate-200 text-destructive"
+                onClick={onDelete}
+                aria-label="Eliminar pedido"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600">

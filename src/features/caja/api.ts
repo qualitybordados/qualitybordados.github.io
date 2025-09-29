@@ -1,4 +1,17 @@
-import { Timestamp, addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, where } from 'firebase/firestore'
+import {
+  Timestamp,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { MovimientoCaja } from '@/lib/types'
 import { MovimientoCajaForm } from '@/lib/validators'
@@ -48,5 +61,37 @@ export async function crearMovimientoCaja(values: MovimientoCajaForm, usuarioId:
     accion: 'CREAR',
     usuario: usuarioId,
     datos: payload,
+  })
+}
+
+export async function actualizarMovimientoCaja(id: string, values: MovimientoCajaForm, usuarioId: string) {
+  const docRef = doc(movimientosRef, id)
+  const payload = {
+    fecha: Timestamp.fromDate(values.fecha),
+    tipo: values.tipo,
+    categoria: values.categoria,
+    monto: values.monto,
+    referencia_pedido_id: values.referencia_pedido_id ? doc(db, 'pedidos', values.referencia_pedido_id) : null,
+    notas: values.notas ?? '',
+    actualizado_en: serverTimestamp(),
+  }
+  await updateDoc(docRef, payload)
+  await registrarBitacora({
+    entidad: 'movimientos_caja',
+    entidad_id: id,
+    accion: 'ACTUALIZAR',
+    usuario: usuarioId,
+    datos: payload,
+  })
+}
+
+export async function eliminarMovimientoCaja(id: string, usuarioId: string) {
+  await deleteDoc(doc(movimientosRef, id))
+  await registrarBitacora({
+    entidad: 'movimientos_caja',
+    entidad_id: id,
+    accion: 'ELIMINAR',
+    usuario: usuarioId,
+    datos: {},
   })
 }

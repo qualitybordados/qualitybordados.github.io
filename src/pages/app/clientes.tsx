@@ -166,6 +166,7 @@ export default function ClientesPage() {
               cliente={cliente}
               onOpenDetalle={() => openDetalle(cliente)}
               onOpenEditar={() => openEditarCliente(cliente)}
+              onEliminar={() => handleEliminarCliente(cliente)}
               canEdit={canEdit}
             />
           ))
@@ -228,11 +229,13 @@ function ClienteCard({
   cliente,
   onOpenDetalle,
   onOpenEditar,
+  onEliminar,
   canEdit,
 }: {
   cliente: Cliente
   onOpenDetalle: () => void
   onOpenEditar: () => void
+  onEliminar: () => void
   canEdit: boolean
 }) {
   const estatusColor = cliente.estatus === 'ACTIVO' ? 'success' : 'warning'
@@ -251,18 +254,32 @@ function ClienteCard({
           <p className="text-sm text-slate-500">{cliente.nombre_legal}</p>
         </div>
         {canEdit ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 border border-slate-200"
-            onClick={(event) => {
-              event.stopPropagation()
-              onOpenEditar()
-            }}
-            aria-label="Editar cliente"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 border border-slate-200"
+              onClick={(event) => {
+                event.stopPropagation()
+                onOpenEditar()
+              }}
+              aria-label="Editar cliente"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 border border-slate-200 text-destructive"
+              onClick={(event) => {
+                event.stopPropagation()
+                onEliminar()
+              }}
+              aria-label="Eliminar cliente"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
         ) : null}
       </div>
 
