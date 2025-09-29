@@ -9,7 +9,7 @@ type SelectProps = SelectPrimitive.SelectProps & {
 export function Select({ children, ...props }: SelectProps) {
   return (
     <SelectPrimitive.Root {...props}>
-      <SelectPrimitive.Trigger className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2">
+      <SelectPrimitive.Trigger className="flex h-12 w-full items-center justify-between rounded-full border border-slate-200 bg-white px-4 text-base focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2">
         <SelectPrimitive.Value />
         <SelectPrimitive.Icon>
           <ChevronDown className="h-4 w-4 text-slate-500" />
@@ -30,7 +30,7 @@ export function SelectItem({ children, className, ...props }: SelectPrimitive.Se
   return (
     <SelectPrimitive.Item
       className={clsx(
-        'relative flex w-full cursor-default select-none items-center rounded-sm px-3 py-2 text-sm outline-none focus:bg-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'relative flex w-full cursor-default select-none items-center rounded-md px-3 py-2 text-base outline-none focus:bg-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className,
       )}
       {...props}

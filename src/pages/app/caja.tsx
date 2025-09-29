@@ -4,7 +4,17 @@ import { Button } from '@/components/ui/button'
 import { useMovimientosCaja, useCrearMovimientoCaja } from '@/features/caja/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { MovimientoCaja } from '@/lib/types'
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Download, Plus, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
@@ -162,7 +172,7 @@ export default function CajaPage() {
       ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="rounded-3xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar movimiento</DialogTitle>
             <DialogDescription>Captura un ingreso o egreso y guarda la referencia en la bitácora.</DialogDescription>
@@ -213,7 +223,7 @@ function ResumenItem({
   )
 }
 
-function MovimientoCard({ movimiento }: { movimiento: any }) {
+function MovimientoCard({ movimiento }: { movimiento: MovimientoCaja }) {
   const esIngreso = movimiento.tipo === 'INGRESO'
   const tipoBadge = esIngreso ? 'success' : 'warning'
 
@@ -256,56 +266,67 @@ function MovimientoForm({
   const [referencia, setReferencia] = useState('')
   const [notas, setNotas] = useState('')
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await onSubmit({
+      fecha: dayjs(fecha).toDate(),
+      tipo,
+      categoria,
+      monto,
+      referencia_pedido_id: referencia ? referencia : undefined,
+      notas,
+    })
+  }
+
   return (
-    <div className="space-y-4">
-      <label className="flex flex-col gap-1 text-sm">
-        Fecha
-        <Input type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Tipo
-        <select
-          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          value={tipo}
-          onChange={(event) => setTipo(event.target.value as 'INGRESO' | 'EGRESO')}
-        >
-          <option value="INGRESO">Ingreso</option>
-          <option value="EGRESO">Egreso</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Categoría
-        <Input value={categoria} onChange={(event) => setCategoria(event.target.value)} />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Monto
-        <Input type="number" step="0.01" value={monto} onChange={(event) => setMonto(Number(event.target.value))} />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Referencia pedido (opcional)
-        <Input value={referencia} onChange={(event) => setReferencia(event.target.value)} />
-      </label>
-      <Textarea placeholder="Notas" value={notas} onChange={(event) => setNotas(event.target.value)} />
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button
-          onClick={() =>
-            onSubmit({
-              fecha: dayjs(fecha).toDate(),
-              tipo,
-              categoria,
-              monto,
-              referencia_pedido_id: referencia ? referencia : undefined,
-              notas,
-            })
-          }
-          disabled={isSubmitting}
-        >
+    <form className="flex h-full flex-col" onSubmit={handleSubmit}>
+      <DialogBody className="space-y-4">
+        <label className="flex flex-col gap-1 text-sm">
+          Fecha
+          <Input type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} disabled={isSubmitting} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Tipo
+          <select
+            className="h-12 rounded-full border border-slate-200 bg-white px-4 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            value={tipo}
+            onChange={(event) => setTipo(event.target.value as 'INGRESO' | 'EGRESO')}
+            disabled={isSubmitting}
+          >
+            <option value="INGRESO">Ingreso</option>
+            <option value="EGRESO">Egreso</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Categoría
+          <Input value={categoria} onChange={(event) => setCategoria(event.target.value)} disabled={isSubmitting} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Monto
+          <Input
+            type="number"
+            step="0.01"
+            value={monto}
+            onChange={(event) => setMonto(Number(event.target.value))}
+            disabled={isSubmitting}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Referencia pedido (opcional)
+          <Input value={referencia} onChange={(event) => setReferencia(event.target.value)} disabled={isSubmitting} />
+        </label>
+        <Textarea placeholder="Notas" value={notas} onChange={(event) => setNotas(event.target.value)} disabled={isSubmitting} />
+      </DialogBody>
+      <DialogFooter className="gap-3 sm:justify-end">
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+        </DialogClose>
+        <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? 'Guardando...' : 'Registrar'}
         </Button>
-      </div>
-    </div>
+      </DialogFooter>
+    </form>
   )
 }

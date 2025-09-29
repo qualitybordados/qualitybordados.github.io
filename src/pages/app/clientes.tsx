@@ -7,8 +7,18 @@ import { ClienteFormFields } from '@/features/clientes/components/cliente-form'
 import { useClientes, useCreateCliente, useDeleteCliente, useUpdateCliente } from '@/features/clientes/hooks'
 import { usePedidos } from '@/features/pedidos/hooks'
 import { Cliente } from '@/lib/types'
+import { ClienteForm } from '@/lib/validators'
 import { formatCurrency, formatPhone } from '@/lib/format'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { Alert } from '@/components/ui/alert'
@@ -49,13 +59,13 @@ export default function ClientesPage() {
     return clientes.filter((cliente) => (ciudadFiltro ? cliente.ciudad === ciudadFiltro : true))
   }, [clientes, ciudadFiltro])
 
-  async function handleCrearCliente(values: any) {
+  async function handleCrearCliente(values: ClienteForm) {
     if (!user) return
     await createMutation.mutateAsync({ data: values, usuarioId: user.uid })
     setModalOpen(false)
   }
 
-  async function handleActualizarCliente(values: any) {
+  async function handleActualizarCliente(values: ClienteForm) {
     if (!user || !clienteSeleccionado) return
     await updateMutation.mutateAsync({ id: clienteSeleccionado.id, data: values, usuarioId: user.uid })
     setModalOpen(false)
@@ -179,7 +189,7 @@ export default function ClientesPage() {
       ) : null}
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{clienteSeleccionado ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
             <DialogDescription>
@@ -192,14 +202,21 @@ export default function ClientesPage() {
             defaultValues={clienteSeleccionado ?? undefined}
             onSubmit={clienteSeleccionado ? handleActualizarCliente : handleCrearCliente}
             submitLabel={clienteSeleccionado ? 'Actualizar cliente' : 'Crear cliente'}
+            onCancel={() => setModalOpen(false)}
           />
         </DialogContent>
       </Dialog>
 
       <Dialog open={detalleOpen} onOpenChange={setDetalleOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl">
+        <DialogContent>
           {clienteSeleccionado ? (
-            <ClienteDetalle cliente={clienteSeleccionado} puedeEliminar={canEdit} onEliminar={handleEliminarCliente} />
+            <>
+              <DialogHeader className="items-start text-left">
+                <DialogTitle className="text-xl">{clienteSeleccionado.alias}</DialogTitle>
+                <DialogDescription>{clienteSeleccionado.nombre_legal}</DialogDescription>
+              </DialogHeader>
+              <ClienteDetalle cliente={clienteSeleccionado} puedeEliminar={canEdit} onEliminar={handleEliminarCliente} />
+            </>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -285,62 +302,64 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
   }, [pedidos])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <DialogHeader className="items-start text-left">
-          <DialogTitle className="text-xl font-semibold text-slate-900">{cliente.alias}</DialogTitle>
-          <DialogDescription>{cliente.nombre_legal}</DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogBody className="space-y-6">
+        <Tabs defaultValue="datos" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 rounded-full bg-slate-100 p-1 text-xs">
+            <TabsTrigger value="datos" className="rounded-full">Datos</TabsTrigger>
+            <TabsTrigger value="pedidos" className="rounded-full">Pedidos</TabsTrigger>
+            <TabsTrigger value="saldos" className="rounded-full">Saldos</TabsTrigger>
+          </TabsList>
+          <TabsContent value="datos" className="mt-4 space-y-3 text-sm">
+            <InfoRow label="RFC" value={cliente.rfc} />
+            <InfoRow label="Correo" value={cliente.email} />
+            <InfoRow label="Teléfono" value={formatPhone(cliente.telefono)} />
+            <InfoRow label="Ciudad" value={`${cliente.ciudad} · CP ${cliente.cp}`} />
+            <InfoRow label="Dirección" value={cliente.direccion} />
+            <InfoRow label="Límite de crédito" value={formatCurrency(cliente.limite_credito)} />
+            <InfoRow label="Días de crédito" value={`${cliente.dias_credito} días`} />
+          </TabsContent>
+          <TabsContent value="pedidos" className="mt-4 space-y-3">
+            {pedidos && pedidos.length ? (
+              pedidos.map((pedido) => (
+                <div key={pedido.id} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">Folio {pedido.folio}</p>
+                      <p className="text-xs text-slate-500">Estado: {pedido.status}</p>
+                    </div>
+                    <Badge variant={pedido.saldo > 0 ? 'warning' : 'success'}>{formatCurrency(pedido.saldo)}</Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Entrega: {dayjs(pedido.fecha_compromiso.toDate()).format('DD MMM YYYY')}</p>
+                </div>
+              ))
+            ) : (
+              <EmptyState title="Sin pedidos" description="Aún no hay pedidos registrados para este cliente." />
+            )}
+          </TabsContent>
+          <TabsContent value="saldos" className="mt-4">
+            <Alert
+              variant={saldoTotal > 0 ? 'warning' : 'success'}
+              title={saldoTotal > 0 ? 'Saldo pendiente' : 'Cliente al corriente'}
+              description={`Saldo total: ${formatCurrency(saldoTotal)}`}
+            />
+          </TabsContent>
+        </Tabs>
+      </DialogBody>
+      <DialogFooter className="gap-3 sm:justify-between">
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto">
+            Cerrar
+          </Button>
+        </DialogClose>
         {puedeEliminar ? (
-          <Button variant="destructive" size="sm" onClick={() => onEliminar(cliente)}>
+          <Button variant="destructive" className="w-full sm:w-auto" onClick={() => onEliminar(cliente)}>
             <Trash className="h-4 w-4" />
             <span>Eliminar</span>
           </Button>
         ) : null}
-      </div>
-
-      <Tabs defaultValue="datos" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 rounded-full bg-slate-100 p-1 text-xs">
-          <TabsTrigger value="datos" className="rounded-full">Datos</TabsTrigger>
-          <TabsTrigger value="pedidos" className="rounded-full">Pedidos</TabsTrigger>
-          <TabsTrigger value="saldos" className="rounded-full">Saldos</TabsTrigger>
-        </TabsList>
-        <TabsContent value="datos" className="mt-4 space-y-3 text-sm">
-          <InfoRow label="RFC" value={cliente.rfc} />
-          <InfoRow label="Correo" value={cliente.email} />
-          <InfoRow label="Teléfono" value={formatPhone(cliente.telefono)} />
-          <InfoRow label="Ciudad" value={`${cliente.ciudad} · CP ${cliente.cp}`} />
-          <InfoRow label="Dirección" value={cliente.direccion} />
-          <InfoRow label="Límite de crédito" value={formatCurrency(cliente.limite_credito)} />
-          <InfoRow label="Días de crédito" value={`${cliente.dias_credito} días`} />
-        </TabsContent>
-        <TabsContent value="pedidos" className="mt-4 space-y-3">
-          {pedidos && pedidos.length ? (
-            pedidos.map((pedido) => (
-              <div key={pedido.id} className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">Folio {pedido.folio}</p>
-                    <p className="text-xs text-slate-500">Estado: {pedido.status}</p>
-                  </div>
-                  <Badge variant={pedido.saldo > 0 ? 'warning' : 'success'}>{formatCurrency(pedido.saldo)}</Badge>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">Entrega: {dayjs(pedido.fecha_compromiso.toDate()).format('DD MMM YYYY')}</p>
-              </div>
-            ))
-          ) : (
-            <EmptyState title="Sin pedidos" description="Aún no hay pedidos registrados para este cliente." />
-          )}
-        </TabsContent>
-        <TabsContent value="saldos" className="mt-4">
-          <Alert
-            variant={saldoTotal > 0 ? 'warning' : 'success'}
-            title={saldoTotal > 0 ? 'Saldo pendiente' : 'Cliente al corriente'}
-            description={`Saldo total: ${formatCurrency(saldoTotal)}`}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+      </DialogFooter>
+    </>
   )
 }
 
