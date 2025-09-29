@@ -5,9 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:publish:watch": "node scripts/index.mjs dev-publish-watch",
+    "clean": "node scripts/index.mjs clean",
     "build": "tsc && vite build",
+    "publish:docs": "node scripts/index.mjs publish-docs",
+    "verify:docs": "node scripts/index.mjs verify-docs",
+    "version:bust": "node scripts/index.mjs version-bust",
+    "release": "node scripts/index.mjs release",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -38,9 +45,11 @@
     "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.21",
+    "chokidar": "^3.6.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "husky": "^9.1.6",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.13",
     "tailwindcss-animate": "^1.0.7",

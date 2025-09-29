@@ -1,0 +1,10 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+set -e
+
+echo "🔎 Verificando docs/ antes del push..."
+if ! npm run verify:docs; then
+  echo "❌ docs/ y dist/ no están sincronizados. Ejecuta npm run release y vuelve a intentar." >&2
+  exit 1
+fi
