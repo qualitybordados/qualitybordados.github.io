@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { actualizarEstadoPedido, createPedido, eliminarPedido, fetchPedidoItems, fetchPedidos, updatePedido } from './api'
+import {
+  actualizarEstadoPedido,
+  createPedido,
+  eliminarPedido,
+  fetchPedidoAbonos,
+  fetchPedidoItems,
+  fetchPedidos,
+  updatePedido,
+} from './api'
 import { PedidoEstado } from '@/lib/types'
 import { PedidoForm } from '@/lib/validators'
 
@@ -28,6 +36,15 @@ export function usePedidoItems(pedidoId?: string, options: { enabled?: boolean }
   return useQuery({
     queryKey: [...PEDIDOS_KEY, 'items', pedidoId],
     queryFn: () => fetchPedidoItems(pedidoId as string),
+    enabled: !!pedidoId && options.enabled,
+    staleTime: 1000 * 30,
+  })
+}
+
+export function usePedidoAbonos(pedidoId?: string, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: [...PEDIDOS_KEY, 'abonos', pedidoId],
+    queryFn: () => fetchPedidoAbonos(pedidoId as string),
     enabled: !!pedidoId && options.enabled,
     staleTime: 1000 * 30,
   })

@@ -14,9 +14,9 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
+import { Abono, Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
 import { PedidoForm } from '@/lib/validators'
-import { movimientosCajaCollection, pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
+import { abonosCollection, movimientosCajaCollection, pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
 
 const pedidosRef = collection(db, 'pedidos')
 
@@ -53,6 +53,27 @@ export async function fetchPedidoItems(pedidoId: string) {
       precio_unitario: data.precio_unitario,
       importe: data.importe,
     } satisfies PedidoItem
+  })
+}
+
+export async function fetchPedidoAbonos(pedidoId: string) {
+  const pedidoRef = doc(db, 'pedidos', pedidoId)
+  const q = query(abonosCollection, where('pedido_id', '==', pedidoRef), orderBy('fecha', 'desc'))
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data()
+    return {
+      id: docSnap.id,
+      pedido_id: data.pedido_id,
+      cliente_id: data.cliente_id,
+      fecha: data.fecha,
+      monto: data.monto,
+      metodo: data.metodo,
+      ref: data.ref ?? '',
+      notas: data.notas ?? '',
+      registrado_por: data.registrado_por,
+      creado_en: data.creado_en,
+    } satisfies Abono
   })
 }
 

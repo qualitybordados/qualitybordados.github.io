@@ -1,11 +1,12 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import dayjs from 'dayjs'
-import { Cliente, Pedido, PedidoItem } from '@/lib/types'
+import { Abono, Cliente, Pedido, PedidoItem } from '@/lib/types'
 
 export type PedidoPdfPayload = {
   pedido: Pedido
   cliente: Cliente | null
   items: PedidoItem[]
+  abonos: Abono[]
 }
 
 const currencyFormatter = new Intl.NumberFormat('es-MX', {
@@ -74,7 +75,7 @@ function wrapText({
   return lines
 }
 
-export async function generatePedidoPdf({ pedido, cliente, items }: PedidoPdfPayload) {
+export async function generatePedidoPdf({ pedido, cliente, items, abonos }: PedidoPdfPayload) {
   const pdfDoc = await PDFDocument.create()
   const pageMargin = 40
   const pageWidth = 595.28
@@ -92,7 +93,44 @@ export async function generatePedidoPdf({ pedido, cliente, items }: PedidoPdfPay
   const tableWidth = descriptionColumnWidth + quantityColumnWidth + unitPriceColumnWidth + subtotalColumnWidth
   const tableStartX = pageMargin
 
-  const resumenHeight = 100
+  const summaryLineSpacing = 20
+  const totalAbonos = abonos.reduce((sum, abono) => sum + abono.monto, 0)
+  const summaryLines: Array<[string, number]> = [
+    ['Subtotal', pedido.subtotal],
+    ['Descuento', pedido.descuento],
+    ['Impuestos', pedido.impuestos],
+    ['Total', pedido.total],
+    ['Anticipo', pedido.anticipo],
+    ['Abonos', totalAbonos],
+    ['Saldo', pedido.saldo],
+  ]
+  const summaryHeight = summaryLines.length * summaryLineSpacing + 40
+
+  const abonoDetails = abonos.map((abono) => {
+    const notasTexto = (abono.notas ?? '').trim()
+    const notaLines = notasTexto
+      ? wrapText({ text: `Notas: ${notasTexto}`, font, size: 10, maxWidth: tableWidth - 80 })
+      : []
+    return {
+      id: abono.id,
+      fechaLabel: formatDate(abono.fecha.toDate()),
+      metodoLabel: abono.metodo.charAt(0) + abono.metodo.slice(1).toLowerCase(),
+      referencia: (abono.ref ?? '').trim(),
+      monto: abono.monto,
+      notaLines,
+    }
+  })
+
+  const abonosSectionHeight =
+    (abonoDetails.length
+      ? abonoDetails.reduce((acc, detalle) => acc + 18 + (detalle.notaLines.length ? 6 + detalle.notaLines.length * 12 : 0), 0)
+      : 18) + 40
+
+  const notas = (pedido.notas ?? '').trim() || 'Sin notas adicionales.'
+  const notesLines = wrapText({ text: notas, font, size: 11, maxWidth: tableWidth })
+  const notesSectionHeight = notesLines.length * 14 + 40
+
+  const resumenHeight = summaryHeight + abonosSectionHeight + notesSectionHeight
 
   let cursorY = pageHeight - pageMargin
 
@@ -297,45 +335,96 @@ export async function generatePedidoPdf({ pedido, cliente, items }: PedidoPdfPay
 
   page.drawRectangle({
     x: summaryX,
-    y: summaryStartY - 130,
+    y: summaryStartY - summaryHeight,
     width: summaryWidth,
-    height: 130,
+    height: summaryHeight,
     color: rgb(0.98, 0.98, 0.99),
     borderWidth: 0.3,
     borderColor: rgb(0.85, 0.85, 0.85),
   })
 
-  const summaryLines: Array<[string, number]> = [
-    ['Subtotal', pedido.subtotal],
-    ['Descuento', pedido.descuento],
-    ['Impuestos', pedido.impuestos],
-    ['Total', pedido.total],
-    ['Anticipo', pedido.anticipo],
-    ['Saldo', pedido.saldo],
-  ]
-
-  let summaryCursorY = summaryStartY - 18
+  let summaryCursorY = summaryStartY - 24
   summaryLines.forEach(([label, value], index) => {
+    const valueFont = index >= 3 ? boldFont : font
     page.drawText(label + ':', {
       x: summaryX + 12,
       y: summaryCursorY,
       size: 11,
-      font: index >= 3 ? boldFont : font,
+      font: valueFont,
       color: rgb(0.2, 0.2, 0.2),
     })
     const formatted = formatCurrency(value)
-    const textWidth = font.widthOfTextAtSize(formatted, 11)
+    const textWidth = valueFont.widthOfTextAtSize(formatted, 11)
     page.drawText(formatted, {
       x: summaryX + summaryWidth - textWidth - 12,
       y: summaryCursorY,
       size: 11,
-      font: index >= 3 ? boldFont : font,
+      font: valueFont,
       color: rgb(0.2, 0.2, 0.2),
     })
-    summaryCursorY -= 20
+    summaryCursorY -= summaryLineSpacing
   })
 
-  const notesY = summaryStartY - 150
+  cursorY = summaryStartY - summaryHeight - 20
+
+  const abonosTitleY = cursorY
+  page.drawText('Abonos registrados', {
+    x: tableStartX,
+    y: abonosTitleY,
+    size: 12,
+    font: boldFont,
+    color: rgb(0.15, 0.15, 0.17),
+  })
+
+  let abonosCursorY = abonosTitleY - 18
+
+  if (abonoDetails.length) {
+    abonoDetails.forEach((detalle) => {
+      const referenceText = detalle.referencia ? ` · Ref: ${detalle.referencia}` : ''
+      const infoLine = `${detalle.fechaLabel} · ${detalle.metodoLabel}${referenceText}`
+      page.drawText(infoLine, {
+        x: tableStartX,
+        y: abonosCursorY,
+        size: 11,
+        font,
+        color: rgb(0.2, 0.2, 0.2),
+      })
+      const amountText = formatCurrency(detalle.monto)
+      const amountWidth = boldFont.widthOfTextAtSize(amountText, 11)
+      page.drawText(amountText, {
+        x: tableStartX + tableWidth - amountWidth,
+        y: abonosCursorY,
+        size: 11,
+        font: boldFont,
+        color: rgb(0.2, 0.2, 0.2),
+      })
+      abonosCursorY -= 14
+      detalle.notaLines.forEach((line) => {
+        page.drawText(line, {
+          x: tableStartX + 10,
+          y: abonosCursorY,
+          size: 10,
+          font,
+          color: rgb(0.35, 0.35, 0.35),
+        })
+        abonosCursorY -= 12
+      })
+      abonosCursorY -= 6
+    })
+  } else {
+    page.drawText('Sin abonos registrados.', {
+      x: tableStartX,
+      y: abonosCursorY,
+      size: 11,
+      font,
+      color: rgb(0.4, 0.4, 0.4),
+    })
+    abonosCursorY -= 16
+  }
+
+  cursorY = abonosCursorY - 12
+
+  const notesY = cursorY
   page.drawText('Notas', {
     x: tableStartX,
     y: notesY,
@@ -344,8 +433,6 @@ export async function generatePedidoPdf({ pedido, cliente, items }: PedidoPdfPay
     color: rgb(0.15, 0.15, 0.17),
   })
 
-  const notas = (pedido.notas ?? '').trim() || 'Sin notas adicionales.'
-  const notesLines = wrapText({ text: notas, font, size: 11, maxWidth: tableWidth })
   notesLines.forEach((line, index) => {
     page.drawText(line, {
       x: tableStartX,

@@ -19,6 +19,7 @@ import {
   useUpdatePedido,
   useEliminarPedido,
   usePedidoItems,
+  usePedidoAbonos,
 } from '@/features/pedidos/hooks'
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
@@ -931,15 +932,18 @@ function DetallePedido({
   usuarioId: string | null
   onClose: () => void
 }) {
-  const { data: items, isLoading } = usePedidoItems(pedido.id, { enabled: true })
+  const { data: items, isLoading: itemsLoading } = usePedidoItems(pedido.id, { enabled: true })
+  const { data: abonos, isLoading: abonosLoading } = usePedidoAbonos(pedido.id, { enabled: true })
   const [busyAction, setBusyAction] = useState<'pdf' | 'share' | 'whatsapp' | null>(null)
 
   const itemsList = items ?? []
+  const abonosList = abonos ?? []
   const compromiso = pedido.fecha_compromiso.toDate()
   const compromisoLabel = dayjs(compromiso).format('DD/MM/YYYY')
   const fechaPedidoLabel = dayjs(pedido.fecha_pedido.toDate()).format('DD/MM/YYYY')
   const telefonoCliente = cliente?.telefono ?? ''
   const telefonoDigits = telefonoCliente.replace(/\D/g, '')
+  const totalAbonos = useMemo(() => abonosList.reduce((sum, abono) => sum + abono.monto, 0), [abonosList])
   const currencyTextFormatter = useMemo(
     () =>
       new Intl.NumberFormat('es-MX', {
@@ -951,6 +955,11 @@ function DetallePedido({
 
   function formatCurrencyLabel(value: number) {
     return `$ ${currencyTextFormatter.format(value || 0)} MXN`
+  }
+
+  function formatMetodoPagoLabel(value: string) {
+    if (!value) return ''
+    return value.charAt(0) + value.slice(1).toLowerCase()
   }
 
   function buildWhatsappMessage() {
@@ -1009,12 +1018,12 @@ function DetallePedido({
   }
 
   async function buildPdfAssets() {
-    return generatePedidoPdf({ pedido, cliente, items: itemsList })
+    return generatePedidoPdf({ pedido, cliente, items: itemsList, abonos: abonosList })
   }
 
   async function handleGeneratePdf() {
-    if (isLoading) {
-      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+    if (itemsLoading || abonosLoading) {
+      alert('Los datos del pedido se están cargando. Intenta nuevamente en unos segundos.')
       return
     }
     setBusyAction('pdf')
@@ -1031,8 +1040,8 @@ function DetallePedido({
   }
 
   async function handleSharePdf() {
-    if (isLoading) {
-      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+    if (itemsLoading || abonosLoading) {
+      alert('Los datos del pedido se están cargando. Intenta nuevamente en unos segundos.')
       return
     }
     setBusyAction('share')
@@ -1072,8 +1081,8 @@ function DetallePedido({
   }
 
   async function handleWhatsapp() {
-    if (isLoading) {
-      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+    if (itemsLoading || abonosLoading) {
+      alert('Los datos del pedido se están cargando. Intenta nuevamente en unos segundos.')
       return
     }
     if (telefonoDigits.length !== 10) {
@@ -1161,14 +1170,14 @@ function DetallePedido({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="font-medium text-slate-600">Items del pedido</p>
-            {isLoading ? (
+            {itemsLoading ? (
               <span className="text-xs text-slate-500">Cargando...</span>
             ) : (
               <span className="text-xs text-slate-500">{itemsList.length} conceptos</span>
             )}
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-            {isLoading ? (
+            {itemsLoading ? (
               <div className="flex items-center gap-2 rounded-2xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" /> Preparando conceptos del pedido
               </div>
@@ -1191,7 +1200,7 @@ function DetallePedido({
           </div>
         </div>
 
-        <div className="grid gap-3 text-sm md:grid-cols-2">
+        <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
             <p className="font-medium text-slate-600">Resumen</p>
             <div className="text-xs text-slate-500">
@@ -1200,7 +1209,45 @@ function DetallePedido({
               <p>Impuestos: {formatCurrency(pedido.impuestos)}</p>
               <p className="font-semibold text-slate-700">Total: {formatCurrency(pedido.total)}</p>
               <p>Anticipo: {formatCurrency(pedido.anticipo)}</p>
+              <p>Abonos: {formatCurrency(totalAbonos)}</p>
               <p>Saldo: {formatCurrency(pedido.saldo)}</p>
+            </div>
+          </div>
+          <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-slate-600">Abonos</p>
+              {!abonosLoading ? (
+                <span className="text-xs font-semibold text-slate-700">{formatCurrency(totalAbonos)}</span>
+              ) : null}
+            </div>
+            <div className="text-xs text-slate-500">
+              {abonosLoading ? (
+                <p>Cargando abonos...</p>
+              ) : abonosList.length ? (
+                <ul className="space-y-2">
+                  {abonosList.map((abono) => {
+                    const fechaLabel = dayjs(abono.fecha.toDate()).format('DD/MM/YYYY')
+                    const metodoLabel = formatMetodoPagoLabel(abono.metodo)
+                    const referencia = (abono.ref ?? '').trim()
+                    const notas = (abono.notas ?? '').trim()
+                    return (
+                      <li key={abono.id} className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <p className="font-medium text-slate-600">{fechaLabel}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {metodoLabel}
+                            {referencia ? ` · Ref: ${referencia}` : ''}
+                          </p>
+                          {notas ? <p className="text-[11px] text-slate-400">Notas: {notas}</p> : null}
+                        </div>
+                        <span className="whitespace-nowrap font-semibold text-slate-700">{formatCurrency(abono.monto)}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p>Sin abonos registrados.</p>
+              )}
             </div>
           </div>
           <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
