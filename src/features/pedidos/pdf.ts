@@ -95,6 +95,7 @@ export async function generatePedidoPdf({ pedido, cliente, items, abonos }: Pedi
 
   const summaryLineSpacing = 20
   const totalAbonos = abonos.reduce((sum, abono) => sum + abono.monto, 0)
+  const saldoCalculado = Math.max(Math.round((pedido.total - pedido.anticipo - totalAbonos) * 100) / 100, 0)
   const summaryLines: Array<[string, number]> = [
     ['Subtotal', pedido.subtotal],
     ['Descuento', pedido.descuento],
@@ -102,7 +103,7 @@ export async function generatePedidoPdf({ pedido, cliente, items, abonos }: Pedi
     ['Total', pedido.total],
     ['Anticipo', pedido.anticipo],
     ['Abonos', totalAbonos],
-    ['Saldo', pedido.saldo],
+    ['Saldo', saldoCalculado],
   ]
   const summaryHeight = summaryLines.length * summaryLineSpacing + 40
 
