@@ -107,11 +107,21 @@ export async function createPedido(values: PedidoForm, usuarioId: string) {
 
 export async function updatePedido(id: string, values: Partial<PedidoForm>, usuarioId: string) {
   const pedidoDoc = doc(pedidosRef, id)
-  const payload = {
+  const payload: Record<string, unknown> = {
     ...values,
-    fecha_pedido: values.fecha_pedido ? Timestamp.fromDate(values.fecha_pedido) : undefined,
-    fecha_compromiso: values.fecha_compromiso ? Timestamp.fromDate(values.fecha_compromiso) : undefined,
     actualizado_en: serverTimestamp(),
+  }
+
+  if (values.fecha_pedido) {
+    payload.fecha_pedido = Timestamp.fromDate(values.fecha_pedido)
+  } else {
+    delete payload.fecha_pedido
+  }
+
+  if (values.fecha_compromiso) {
+    payload.fecha_compromiso = Timestamp.fromDate(values.fecha_compromiso)
+  } else {
+    delete payload.fecha_compromiso
   }
   await updateDoc(pedidoDoc, payload)
 
