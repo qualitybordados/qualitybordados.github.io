@@ -103,7 +103,11 @@ export default function CajaPage() {
   async function handleEliminarMovimiento(movimiento: MovimientoCaja) {
     if (!user) return
     if (confirm(`¿Eliminar el ${movimiento.tipo.toLowerCase()} por ${formatCurrency(movimiento.monto)}?`)) {
-      await eliminarMovimiento.mutateAsync({ id: movimiento.id, usuarioId: user.uid })
+      await eliminarMovimiento.mutateAsync({
+        id: movimiento.id,
+        usuarioId: user.uid,
+        pedidoId: movimiento.referencia_pedido_id?.id,
+      })
     }
   }
 

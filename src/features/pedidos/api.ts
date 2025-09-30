@@ -2,7 +2,6 @@ import {
   Timestamp,
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -14,9 +13,15 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { Abono, Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
+import { Abono, MovimientoCaja, Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
 import { PedidoForm } from '@/lib/validators'
-import { abonosCollection, movimientosCajaCollection, pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
+import {
+  abonosCollection,
+  movimientosCajaCollection,
+  pedidoItemsCollection,
+  produccionEventosCollection,
+  registrarBitacora,
+} from '@/lib/firestore'
 
 const pedidosRef = collection(db, 'pedidos')
 
@@ -73,6 +78,7 @@ export async function fetchPedidoAbonos(pedidoId: string) {
       notas: data.notas ?? '',
       registrado_por: data.registrado_por,
       creado_en: data.creado_en,
+      ...(data.movimiento_caja_id ? { movimiento_caja_id: data.movimiento_caja_id } : {}),
     } satisfies Abono
   })
 }
@@ -228,12 +234,65 @@ export async function actualizarEstadoPedido(id: string, estado: PedidoEstado, u
 }
 
 export async function eliminarPedido(id: string, usuarioId: string) {
-  await deleteDoc(doc(pedidosRef, id))
-  await registrarBitacora({
-    entidad: 'pedidos',
-    entidad_id: id,
-    accion: 'ELIMINAR',
-    usuario: usuarioId,
-    datos: {},
+  const pedidoRef = doc(pedidosRef, id)
+  const itemsSnapshot = await getDocs(pedidoItemsCollection(id))
+  const eventosSnapshot = await getDocs(produccionEventosCollection(id))
+  const abonosSnapshot = await getDocs(query(abonosCollection, where('pedido_id', '==', pedidoRef)))
+  const movimientosSnapshot = await getDocs(query(movimientosCajaCollection, where('referencia_pedido_id', '==', pedidoRef)))
+
+  const batch = writeBatch(db)
+  const abonosBitacora: { id: string; monto: number }[] = []
+  const movimientosBitacora: { id: string; categoria: string; tipo: string }[] = []
+
+  itemsSnapshot.forEach((itemDoc) => {
+    batch.delete(itemDoc.ref)
   })
+
+  eventosSnapshot.forEach((eventoDoc) => {
+    batch.delete(eventoDoc.ref)
+  })
+
+  abonosSnapshot.forEach((abonoDoc) => {
+    const data = abonoDoc.data() as Omit<Abono, 'id'>
+    abonosBitacora.push({ id: abonoDoc.id, monto: data.monto })
+    batch.delete(abonoDoc.ref)
+  })
+
+  movimientosSnapshot.forEach((movimientoDoc) => {
+    const data = movimientoDoc.data() as Omit<MovimientoCaja, 'id'>
+    movimientosBitacora.push({ id: movimientoDoc.id, categoria: data.categoria ?? '', tipo: data.tipo ?? '' })
+    batch.delete(movimientoDoc.ref)
+  })
+
+  batch.delete(pedidoRef)
+
+  await batch.commit()
+
+  await Promise.all([
+    ...abonosBitacora.map((abono) =>
+      registrarBitacora({
+        entidad: 'abonos',
+        entidad_id: abono.id,
+        accion: 'ELIMINAR',
+        usuario: usuarioId,
+        datos: { motivo: 'PEDIDO_ELIMINADO', monto: abono.monto },
+      }),
+    ),
+    ...movimientosBitacora.map((movimiento) =>
+      registrarBitacora({
+        entidad: 'movimientos_caja',
+        entidad_id: movimiento.id,
+        accion: 'ELIMINAR',
+        usuario: usuarioId,
+        datos: { motivo: 'PEDIDO_ELIMINADO', categoria: movimiento.categoria, tipo: movimiento.tipo },
+      }),
+    ),
+    registrarBitacora({
+      entidad: 'pedidos',
+      entidad_id: id,
+      accion: 'ELIMINAR',
+      usuario: usuarioId,
+      datos: {},
+    }),
+  ])
 }

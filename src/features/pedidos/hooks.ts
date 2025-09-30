@@ -80,6 +80,11 @@ export function useEliminarPedido() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: { id: string; usuarioId: string }) => eliminarPedido(payload.id, payload.usuarioId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY })
+      queryClient.invalidateQueries({ queryKey: ['caja'] })
+      queryClient.invalidateQueries({ queryKey: ['cobranza'] })
+      queryClient.invalidateQueries({ queryKey: ['pedidos', 'abonos', variables.id] })
+    },
   })
 }
