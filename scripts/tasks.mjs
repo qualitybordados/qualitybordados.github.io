@@ -17,8 +17,8 @@ import {
 const SITE_URL = 'https://qualitybordados.github.io'
 const MAIN_JS_REGEX = /^main\.[a-z0-9]+\.js$/i
 const MAIN_SRC_REGEX = /src=["']\/?assets\/(main\.[A-Za-z0-9]+\.js)["']/
-const CSS_REGEX = /^index\.[a-z0-9-]+\.css$/i
-const CSS_HREF_REGEX = /assets\/(index\.[A-Za-z0-9-]+\.css)/
+const CSS_REGEX = /^index\.[\w-]+\.css$/i
+const CSS_HREF_REGEX = /assets\/(index\.[\w-]+\.css)/i
 
 let cachedFirebaseConfig = null
 

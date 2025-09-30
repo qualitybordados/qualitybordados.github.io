@@ -96,7 +96,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-h-screen w-full flex-1 flex-col lg:pl-72">
+      <div className="flex min-h-screen w-full flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-primary px-4 text-primary-foreground shadow-sm sm:px-6 lg:px-10">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4">
             <div className="flex items-center gap-3">
