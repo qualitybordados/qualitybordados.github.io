@@ -56,11 +56,17 @@ sobre las variables de entorno `VITE_FIREBASE_*`.
 ## Instalación y uso local
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-El proyecto expone Vite en http://localhost:5173 y se conecta al proyecto Firebase especificado.
+`npm run dev` inicia automáticamente el watcher `dev:publish:watch`, que levanta el servidor de desarrollo, vigila `src/`,
+`public/` y la configuración clave, reconstruye la app y sincroniza `docs/` en segundo plano cada vez que guardas un archivo. En
+cada iteración se ejecuta `version:bust` para generar un nuevo `data-build` y forzar el _cache busting_. El proyecto expone Vite
+en http://localhost:5173 y se conecta al proyecto Firebase especificado.
+
+Si trabajas en VSCode o Codespaces, la tarea declarada en `.vscode/tasks.json` ejecutará `npm ci` y lanzará el watcher
+automáticamente al abrir la carpeta.
 
 ### Build de producción
 
@@ -68,6 +74,20 @@ El proyecto expone Vite en http://localhost:5173 y se conecta al proyecto Fireba
 npm run build
 npm run preview
 ```
+
+## Flujo de publicación automática
+
+1. **Watcher activo:** cada guardado en `src/`, `public/` o archivos de configuración (`vite.config.ts`, `tailwind.config.js`,
+   `postcss.config.js`, `tsconfig*.json`, `scripts/*.mjs`) dispara un rebuild completo (`npm run build`), sincroniza `dist/` →
+   `docs/`, ejecuta `version:bust` y valida que `docs/index.html` apunte al `main.[hash].js` más reciente. Los logs indican el
+   archivo publicado y el `data-build` generado (formato `YYYYMMDD-HHMMSS`).
+2. **Cache busting garantizado:** `docs/index.html` siempre incluye un `data-build` nuevo. Si GitHub Pages sirve una versión
+   vieja, realiza un _hard reload_ (Disable cache) o agrega `?v=<data-build>` a la URL.
+3. **Hooks obligatorios:** el _pre-commit_ ejecuta `npm run release` (pipeline `clean → build → publish:docs → verify:docs →
+   version:bust → verify:docs`) y añade `docs/` + `.docs-build-meta.json` al commit. El _pre-push_ bloquea el push si `docs/`
+   está desincronizado (`npm run verify:docs`).
+4. **Sin ediciones manuales en `docs/`:** cualquier cambio directo se sobrescribe desde los scripts. Trabaja siempre sobre
+   `src/`/`public/` y deja que el watcher o `npm run release` actualicen la carpeta publicada.
 
 ## Estructura de Firestore
 

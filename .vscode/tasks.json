@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: ci",
+      "type": "shell",
+      "command": "npm ci",
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "dev:publish:watch",
+      "type": "shell",
+      "command": "npm run dev:publish:watch",
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "dependsOn": "npm: ci",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

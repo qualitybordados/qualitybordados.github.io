@@ -46,7 +46,8 @@ export function formatStamp(date = new Date()) {
   const day = pad(date.getDate())
   const hours = pad(date.getHours())
   const minutes = pad(date.getMinutes())
-  return `${year}${month}${day}-${hours}${minutes}`
+  const seconds = pad(date.getSeconds())
+  return `${year}${month}${day}-${hours}${minutes}${seconds}`
 }
 
 export function runCommand(command, args = [], options = {}) {
