@@ -23,17 +23,31 @@ import {
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
 import { useAuth } from '@/hooks/use-auth'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatDate, formatPhone } from '@/lib/format'
 import { Cliente, Pedido, PedidoEstado, Prioridad } from '@/lib/types'
-import { getDocumentId } from '@/lib/firestore'
+import { getDocumentId, registrarBitacora } from '@/lib/firestore'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
-import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight, ChevronLeft, Pencil, Trash } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  Calendar,
+  User,
+  DollarSign,
+  ChevronRight,
+  ChevronLeft,
+  Pencil,
+  Trash,
+  FileDown,
+  Share2,
+  MessageCircle,
+} from 'lucide-react'
 import dayjs from 'dayjs'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { PedidoForm, PedidoItemForm } from '@/lib/validators'
 import { clsx } from 'clsx'
+import { generatePedidoPdf } from '@/features/pedidos/pdf'
 
 const estadosPedido: PedidoEstado[] = [
   'COTIZACIÓN',
@@ -77,8 +91,8 @@ export default function PedidosPage() {
   const { data: clientesData } = useClientes({}, { enabled: authReady })
   const { data: config } = useConfiguracion({ enabled: authReady })
   const clientesMap = useMemo(() => {
-    if (!clientesData) return new Map<string, string>()
-    return new Map(clientesData.map((cliente) => [cliente.id, cliente.alias]))
+    if (!clientesData) return new Map<string, Cliente>()
+    return new Map(clientesData.map((cliente) => [cliente.id, cliente]))
   }, [clientesData])
 
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -185,7 +199,7 @@ export default function PedidosPage() {
             const siguienteEstado = estadosPedido[estadoIndex + 1]
             const anteriorEstado = estadosPedido[estadoIndex - 1]
             const clienteId = getDocumentId(pedido.cliente_id)
-            const clienteNombre = clientesMap.get(clienteId) ?? clienteId
+            const clienteNombre = clientesMap.get(clienteId)?.alias ?? clienteId
             return (
               <PedidoCard
                 key={pedido.id}
@@ -285,7 +299,22 @@ export default function PedidosPage() {
 
       <Dialog open={!!detallePedido} onOpenChange={(open) => !open && setDetallePedido(null)}>
         <DialogContent>
-          {detallePedido ? <DetallePedido pedido={detallePedido} onClose={() => setDetallePedido(null)} /> : null}
+          {detallePedido ? (
+            <DetallePedido
+              pedido={detallePedido}
+              cliente={(() => {
+                try {
+                  const clienteId = getDocumentId(detallePedido.cliente_id)
+                  return clientesMap.get(clienteId) ?? null
+                } catch (error) {
+                  console.error(error)
+                  return null
+                }
+              })()}
+              usuarioId={user?.uid ?? null}
+              onClose={() => setDetallePedido(null)}
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
@@ -502,10 +531,11 @@ function PedidoWizard({
       prev.map((item, idx) => {
         if (idx !== index) return item
         if (field === 'descripcion_item') {
-          return { ...item, descripcion_item: String(value) }
+          return { ...item, descripcion_item: String(value).slice(0, 200) }
         }
         if (field === 'precio_unitario') {
-          const precio = Number(value) || 0
+          const raw = typeof value === 'number' ? value : Number(value)
+          const precio = Number.isFinite(raw) ? Number(raw.toFixed(2)) : 0
           return {
             ...item,
             precio_unitario: precio,
@@ -513,7 +543,8 @@ function PedidoWizard({
           }
         }
         if (field === 'cantidad') {
-          const cantidad = Math.max(1, Math.floor(Number(value) || 0))
+          const raw = typeof value === 'number' ? value : Number(value)
+          const cantidad = Math.max(1, Math.floor(Number.isFinite(raw) ? raw : 0))
           return {
             ...item,
             cantidad,
@@ -521,7 +552,8 @@ function PedidoWizard({
           }
         }
         if (field === 'importe') {
-          const importeActual = Number(value) || 0
+          const raw = typeof value === 'number' ? value : Number(value)
+          const importeActual = Number.isFinite(raw) ? raw : 0
           return { ...item, importe: Number(importeActual.toFixed(2)) }
         }
         return item
@@ -693,22 +725,27 @@ function PedidoWizard({
           <div className="space-y-4">
             {items.map((item, index) => (
               <div key={index} className="rounded-2xl border border-slate-200 p-4">
-                <div className="grid gap-3 md:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <label className="flex flex-col gap-1 text-sm md:col-span-2 lg:col-span-2">
+                    Descripción
+                    <Input
+                      value={item.descripcion_item}
+                      maxLength={200}
+                      autoComplete="off"
+                      onChange={(event) => updateItem(index, 'descripcion_item', event.target.value)}
+                      placeholder="Describe el servicio o producto"
+                    />
+                  </label>
                   <label className="flex flex-col gap-1 text-sm">
                     Cantidad
                     <Input
                       type="number"
                       min={1}
                       step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={item.cantidad}
                       onChange={(event) => updateItem(index, 'cantidad', Number(event.target.value))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                    Descripción
-                    <Input
-                      value={item.descripcion_item}
-                      onChange={(event) => updateItem(index, 'descripcion_item', event.target.value)}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -716,13 +753,15 @@ function PedidoWizard({
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
+                      inputMode="decimal"
                       value={item.precio_unitario}
                       onChange={(event) => updateItem(index, 'precio_unitario', Number(event.target.value))}
                     />
                   </label>
-                  <label className="flex flex-col gap-1 text-sm md:col-span-1">
+                  <label className="flex flex-col gap-1 text-sm lg:col-span-1">
                     Subtotal
-                    <Input type="number" readOnly value={item.importe.toFixed(2)} />
+                    <Input type="text" inputMode="decimal" readOnly value={item.importe.toFixed(2)} />
                     <span className="text-xs text-slate-500">Se calcula automáticamente.</span>
                   </label>
                 </div>
@@ -881,40 +920,333 @@ function PedidoWizard({
   )
 }
 
-function DetallePedido({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
+function DetallePedido({
+  pedido,
+  cliente,
+  usuarioId,
+  onClose,
+}: {
+  pedido: Pedido
+  cliente: Cliente | null
+  usuarioId: string | null
+  onClose: () => void
+}) {
+  const { data: items, isLoading } = usePedidoItems(pedido.id, { enabled: true })
+  const [busyAction, setBusyAction] = useState<'pdf' | 'share' | 'whatsapp' | null>(null)
+
+  const itemsList = items ?? []
+  const compromiso = pedido.fecha_compromiso.toDate()
+  const compromisoLabel = dayjs(compromiso).format('DD/MM/YYYY')
+  const fechaPedidoLabel = dayjs(pedido.fecha_pedido.toDate()).format('DD/MM/YYYY')
+  const telefonoCliente = cliente?.telefono ?? ''
+  const telefonoDigits = telefonoCliente.replace(/\D/g, '')
+  const currencyTextFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('es-MX', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [],
+  )
+
+  function formatCurrencyLabel(value: number) {
+    return `$ ${currencyTextFormatter.format(value || 0)} MXN`
+  }
+
+  function buildWhatsappMessage() {
+    const lines: string[] = []
+    lines.push(`Pedido ${pedido.folio}`)
+    if (cliente) {
+      lines.push(`Cliente: ${cliente.alias}`)
+    }
+    lines.push(`Fecha compromiso: ${compromisoLabel}`)
+    lines.push(`Total: ${formatCurrencyLabel(pedido.total)}`)
+    lines.push(`Saldo: ${formatCurrencyLabel(pedido.saldo)}`)
+    lines.push('')
+    lines.push('Detalle:')
+    if (itemsList.length) {
+      itemsList.forEach((item) => {
+        const descripcion = item.descripcion_item.replace(/\s+/g, ' ').trim()
+        lines.push(`• ${descripcion || 'Sin descripción'} x${item.cantidad} — ${formatCurrencyLabel(item.importe)}`)
+      })
+    } else {
+      lines.push('• Sin conceptos registrados')
+    }
+    if (pedido.notas) {
+      lines.push('')
+      lines.push(`Notas: ${pedido.notas}`)
+    }
+    lines.push('')
+    lines.push('Gracias por tu preferencia.')
+    return lines.join('\n')
+  }
+
+  async function logEvento(accion: string, datos: Record<string, unknown>) {
+    if (!usuarioId) return
+    try {
+      await registrarBitacora({
+        entidad: 'pedidos',
+        entidad_id: pedido.id,
+        accion,
+        usuario: usuarioId,
+        datos,
+      })
+    } catch (error) {
+      console.error('No se pudo registrar la bitácora', error)
+    }
+  }
+
+  function downloadBlob(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.rel = 'noopener'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  async function buildPdfAssets() {
+    return generatePedidoPdf({ pedido, cliente, items: itemsList })
+  }
+
+  async function handleGeneratePdf() {
+    if (isLoading) {
+      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+      return
+    }
+    setBusyAction('pdf')
+    try {
+      const { blob, fileName } = await buildPdfAssets()
+      downloadBlob(blob, fileName)
+      await logEvento('GENERAR_PDF_PEDIDO', { folio: pedido.folio })
+    } catch (error) {
+      console.error(error)
+      alert('No se pudo generar el PDF. Intenta nuevamente más tarde.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleSharePdf() {
+    if (isLoading) {
+      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+      return
+    }
+    setBusyAction('share')
+    const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean }
+    try {
+      const { blob, fileName } = await buildPdfAssets()
+      const canUseFile = typeof File !== 'undefined'
+      let via: 'web-share' | 'download' = 'download'
+      const file = canUseFile ? new File([blob], fileName, { type: 'application/pdf' }) : null
+      if (file && nav.share) {
+        const shareData: ShareData = {
+          files: [file],
+          title: `Pedido ${pedido.folio}`,
+          text: `Pedido ${pedido.folio} — Total ${formatCurrencyLabel(pedido.total)}`,
+        }
+        const canShareFiles = typeof nav.canShare === 'function' ? nav.canShare(shareData) : true
+        if (canShareFiles) {
+          try {
+            await nav.share(shareData)
+            via = 'web-share'
+          } catch (error) {
+            console.error('No se pudo compartir vía Web Share', error)
+          }
+        }
+      }
+      if (via === 'download') {
+        downloadBlob(blob, fileName)
+        alert('Descargamos el PDF porque tu navegador no permite compartirlo directamente.')
+      }
+      await logEvento('COMPARTIR_PDF_PEDIDO', { folio: pedido.folio, via })
+    } catch (error) {
+      console.error(error)
+      alert('No se pudo compartir el PDF. Intenta nuevamente más tarde.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleWhatsapp() {
+    if (isLoading) {
+      alert('Los conceptos del pedido se están cargando. Intenta nuevamente en unos segundos.')
+      return
+    }
+    if (telefonoDigits.length !== 10) {
+      alert('El número de teléfono del cliente debe tener 10 dígitos para enviar por WhatsApp.')
+      return
+    }
+    setBusyAction('whatsapp')
+    const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean }
+    try {
+      const { blob, fileName } = await buildPdfAssets()
+      const message = buildWhatsappMessage()
+      let via: 'web-share' | 'link' = 'link'
+      const canUseFile = typeof File !== 'undefined'
+      const file = canUseFile ? new File([blob], fileName, { type: 'application/pdf' }) : null
+      if (file && nav.share) {
+        const shareData: ShareData = {
+          files: [file],
+          text: message,
+          title: `Pedido ${pedido.folio}`,
+        }
+        const canShareFiles = typeof nav.canShare === 'function' ? nav.canShare(shareData) : true
+        if (canShareFiles) {
+          try {
+            await nav.share(shareData)
+            via = 'web-share'
+          } catch (error) {
+            console.error('No se pudo compartir vía Web Share', error)
+          }
+        }
+      }
+
+      if (via === 'link') {
+        downloadBlob(blob, fileName)
+        const waUrl = `https://wa.me/52${telefonoDigits}?text=${encodeURIComponent(message)}`
+        window.open(waUrl, '_blank', 'noopener,noreferrer')
+      }
+
+      await logEvento('WHATSAPP_RESUMEN_PEDIDO', { folio: pedido.folio, via, telefono: telefonoDigits })
+    } catch (error) {
+      console.error(error)
+      alert('No se pudo preparar el mensaje de WhatsApp. Intenta nuevamente más tarde.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const isBusy = busyAction !== null
+
   return (
     <>
       <DialogHeader>
         <DialogTitle>Detalle pedido {pedido.folio}</DialogTitle>
-        <DialogDescription>Revisa la información general del pedido y su estado actual.</DialogDescription>
+        <DialogDescription>
+          Revisa la información general del pedido, sus conceptos y comparte el resumen con tus clientes.
+        </DialogDescription>
       </DialogHeader>
-      <DialogBody className="space-y-4">
+      <DialogBody className="space-y-6">
         <div className="grid gap-3 text-sm md:grid-cols-2">
           <div>
             <p className="font-medium text-slate-600">Estado</p>
-            <p>{pedido.status}</p>
+            <p>{pedido.status.replace(/_/g, ' ')}</p>
           </div>
           <div>
-            <p className="font-medium text-slate-600">Saldo</p>
-            <p>{formatCurrency(pedido.saldo)}</p>
+            <p className="font-medium text-slate-600">Fecha del pedido</p>
+            <p>{fechaPedidoLabel}</p>
           </div>
           <div>
             <p className="font-medium text-slate-600">Compromiso</p>
-            <p>{formatDate(pedido.fecha_compromiso.toDate())}</p>
+            <p>{compromisoLabel}</p>
+          </div>
+          <div>
+            <p className="font-medium text-slate-600">Cliente</p>
+            <p>{cliente ? `${cliente.alias} · ${formatPhone(cliente.telefono)}` : 'Sin información del cliente'}</p>
           </div>
           <div>
             <p className="font-medium text-slate-600">Anticipo</p>
             <p>{formatCurrency(pedido.anticipo)}</p>
           </div>
-          <div className="md:col-span-2">
+          <div>
+            <p className="font-medium text-slate-600">Saldo</p>
+            <p>{formatCurrency(pedido.saldo)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-slate-600">Items del pedido</p>
+            {isLoading ? (
+              <span className="text-xs text-slate-500">Cargando...</span>
+            ) : (
+              <span className="text-xs text-slate-500">{itemsList.length} conceptos</span>
+            )}
+          </div>
+          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+            {isLoading ? (
+              <div className="flex items-center gap-2 rounded-2xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" /> Preparando conceptos del pedido
+              </div>
+            ) : itemsList.length ? (
+              itemsList.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
+                  <p className="text-sm font-medium text-slate-700 line-clamp-2">{item.descripcion_item}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <span>Cantidad: {item.cantidad}</span>
+                    <span>Precio unitario: {formatCurrency(item.precio_unitario)}</span>
+                    <span>SubTotal: {formatCurrency(item.importe)}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
+                No hay items registrados en este pedido.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-3 text-sm md:grid-cols-2">
+          <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
+            <p className="font-medium text-slate-600">Resumen</p>
+            <div className="text-xs text-slate-500">
+              <p>Subtotal: {formatCurrency(pedido.subtotal)}</p>
+              <p>Descuento: {formatCurrency(pedido.descuento)}</p>
+              <p>Impuestos: {formatCurrency(pedido.impuestos)}</p>
+              <p className="font-semibold text-slate-700">Total: {formatCurrency(pedido.total)}</p>
+              <p>Anticipo: {formatCurrency(pedido.anticipo)}</p>
+              <p>Saldo: {formatCurrency(pedido.saldo)}</p>
+            </div>
+          </div>
+          <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
             <p className="font-medium text-slate-600">Notas</p>
-            <p>{pedido.notas || 'Sin notas'}</p>
+            <p className="text-xs text-slate-500">{pedido.notas?.trim() ? pedido.notas : 'Sin notas adicionales.'}</p>
           </div>
         </div>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className="flex flex-col gap-3">
+        <div className="grid w-full gap-2 sm:grid-cols-3">
+          <Button
+            type="button"
+            onClick={handleGeneratePdf}
+            className="h-12"
+            disabled={isBusy}
+          >
+            {busyAction === 'pdf' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+            {busyAction === 'pdf' ? 'Generando...' : 'Generar PDF'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSharePdf}
+            className="h-12"
+            disabled={isBusy}
+          >
+            {busyAction === 'share' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+            {busyAction === 'share' ? 'Compartiendo...' : 'Compartir'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleWhatsapp}
+            className="h-12"
+            disabled={isBusy}
+          >
+            {busyAction === 'whatsapp' ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MessageCircle className="mr-2 h-4 w-4" />
+            )}
+            {busyAction === 'whatsapp' ? 'Abriendo WhatsApp...' : 'WhatsApp'}
+          </Button>
+        </div>
         <DialogClose asChild>
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onClose}>
+          <Button type="button" variant="ghost" className="h-12" onClick={onClose} disabled={isBusy}>
             Cerrar
           </Button>
         </DialogClose>
