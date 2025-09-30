@@ -43,7 +43,7 @@ export function LoginForm() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
       <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold text-slate-900">Ingresar a Quality Bordados</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">QUALITY BORDADOS</h1>
         <p className="text-sm text-slate-500">Usa tu correo corporativo y contraseña asignada.</p>
       </div>
       {error ? <Alert variant="destructive" description={error} /> : null}
@@ -66,9 +66,7 @@ export function LoginForm() {
           {isSubmitting ? 'Entrando...' : 'Ingresar'}
         </Button>
       </form>
-      <p className="text-center text-xs text-slate-400">
-        Acceso restringido al personal autorizado. Contacta al administrador para recuperar acceso.
-      </p>
+      <p className="text-center text-xs text-slate-400">Acceso exclusivo para colaboradores.</p>
     </div>
   )
 }
