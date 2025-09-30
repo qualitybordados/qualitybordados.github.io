@@ -97,26 +97,28 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-h-screen w-full flex-1 flex-col lg:pl-72">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-primary px-4 text-primary-foreground shadow-sm sm:px-6 lg:px-10">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="h-10 w-10 bg-primary-foreground text-primary lg:hidden"
-              onClick={() => setIsMenuOpen(true)}
-              aria-label="Abrir menú"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-primary px-4 text-primary-foreground shadow-sm sm:px-6 lg:px-10">
+          <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-10 w-10 bg-primary-foreground text-primary lg:hidden"
+                onClick={() => setIsMenuOpen(true)}
+                aria-label="Abrir menú"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+            <h1 className="text-base font-semibold tracking-tight sm:text-lg">{activeNavigation?.label ?? 'Quality Bordados'}</h1>
+            <Badge variant="neutral" className="text-xs uppercase tracking-wide">
+              {role ?? 'Sin rol'}
+            </Badge>
           </div>
-          <h1 className="text-base font-semibold tracking-tight sm:text-lg">{activeNavigation?.label ?? 'Quality Bordados'}</h1>
-          <Badge variant="neutral" className="text-xs uppercase tracking-wide">
-            {role ?? 'Sin rol'}
-          </Badge>
         </header>
 
         <main className="relative flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-10">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-6">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6">
             <Outlet />
           </div>
         </main>
