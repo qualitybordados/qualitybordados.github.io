@@ -989,6 +989,11 @@ function DetallePedido({
   const telefonoCliente = cliente?.telefono ?? ''
   const telefonoDigits = telefonoCliente.replace(/\D/g, '')
   const totalAbonos = useMemo(() => (abonos ?? []).reduce((sum, abono) => sum + abono.monto, 0), [abonos])
+  const saldoCalculado = useMemo(() => {
+    const pendiente = pedido.total - pedido.anticipo - totalAbonos
+    if (!Number.isFinite(pendiente)) return 0
+    return Math.max(Math.round(pendiente * 100) / 100, 0)
+  }, [pedido.total, pedido.anticipo, totalAbonos])
   const currencyTextFormatter = useMemo(
     () =>
       new Intl.NumberFormat('es-MX', {
@@ -1015,7 +1020,7 @@ function DetallePedido({
     }
     lines.push(`Fecha compromiso: ${compromisoLabel}`)
     lines.push(`Total: ${formatCurrencyLabel(pedido.total)}`)
-    lines.push(`Saldo: ${formatCurrencyLabel(pedido.saldo)}`)
+    lines.push(`Saldo: ${formatCurrencyLabel(saldoCalculado)}`)
     lines.push('')
     lines.push('Detalle:')
     if (itemsList.length) {
@@ -1208,7 +1213,7 @@ function DetallePedido({
           </div>
           <div>
             <p className="font-medium text-slate-600">Saldo</p>
-            <p>{formatCurrency(pedido.saldo)}</p>
+            <p>{formatCurrency(saldoCalculado)}</p>
           </div>
         </div>
 
@@ -1255,7 +1260,7 @@ function DetallePedido({
               <p className="font-semibold text-slate-700">Total: {formatCurrency(pedido.total)}</p>
               <p>Anticipo: {formatCurrency(pedido.anticipo)}</p>
               <p>Abonos: {formatCurrency(totalAbonos)}</p>
-              <p>Saldo: {formatCurrency(pedido.saldo)}</p>
+              <p>Saldo: {formatCurrency(saldoCalculado)}</p>
             </div>
           </div>
           <div className="space-y-1 rounded-2xl border border-slate-200 p-4">
