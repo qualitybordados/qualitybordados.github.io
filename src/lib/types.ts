@@ -56,15 +56,8 @@ export interface Pedido {
 export interface PedidoItem {
   id: string
   descripcion_item: string
-  prenda: string
-  talla: string
-  color_prenda: string
-  ubicacion: string
-  puntadas_estimadas: number
-  cantidad: number
   precio_unitario: number
   importe: number
-  observaciones: string
 }
 
 export interface ProduccionEvento {

@@ -353,6 +353,9 @@ function PedidoWizard({
   const [step, setStep] = useState(1)
   const today = dayjs().startOf('day')
   const [items, setItems] = useState<PedidoItemForm[]>([])
+  const [descuentoActivo, setDescuentoActivo] = useState(false)
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0)
+  const [impuestosActivos, setImpuestosActivos] = useState(true)
   const [formState, setFormState] = useState<Omit<PedidoForm, 'items'>>({
     folio: `QB-${dayjs().format('YYYYMMDD-HHmm')}`,
     cliente_id: clientes[0]?.id ?? '',
@@ -369,15 +372,38 @@ function PedidoWizard({
     saldo: 0,
   })
 
-  const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.cantidad * item.precio_unitario, 0), [items])
-  const total = useMemo(() => subtotal - formState.descuento + formState.impuestos, [subtotal, formState.descuento, formState.impuestos])
-  const saldo = useMemo(() => Math.max(total - formState.anticipo, 0), [total, formState.anticipo])
+  const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.importe, 0), [items])
+  const descuento = useMemo(() => {
+    if (!descuentoActivo) return 0
+    return Number(((subtotal * descuentoPorcentaje) / 100).toFixed(2))
+  }, [descuentoActivo, descuentoPorcentaje, subtotal])
+  const subtotalConDescuento = useMemo(() => Math.max(Number((subtotal - descuento).toFixed(2)), 0), [subtotal, descuento])
+  const impuestos = useMemo(() => {
+    if (!impuestosActivos) return 0
+    return Number((subtotalConDescuento * 0.16).toFixed(2))
+  }, [impuestosActivos, subtotalConDescuento])
+  const total = useMemo(() => Number((subtotalConDescuento + impuestos).toFixed(2)), [subtotalConDescuento, impuestos])
+  const saldo = useMemo(() => Math.max(Number((total - formState.anticipo).toFixed(2)), 0), [total, formState.anticipo])
   const anticipoSugerido = useMemo(() => Number(((total * anticipoMinimo) / 100).toFixed(2)), [total, anticipoMinimo])
   const hasClientes = clientes.length > 0
 
   function updateItem(index: number, field: keyof PedidoItemForm, value: string | number) {
     setItems((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, [field]: field === 'descripcion_item' || typeof value === 'string' ? value : Number(value) } : item)),
+      prev.map((item, idx) => {
+        if (idx !== index) return item
+        if (field === 'descripcion_item') {
+          return { ...item, descripcion_item: String(value) }
+        }
+        if (field === 'precio_unitario') {
+          const precio = Number(value) || 0
+          return { ...item, precio_unitario: precio, importe: Number(precio.toFixed(2)) }
+        }
+        if (field === 'importe') {
+          const importeActual = Number(value) || 0
+          return { ...item, importe: Number(importeActual.toFixed(2)) }
+        }
+        return item
+      }),
     )
   }
 
@@ -386,14 +412,8 @@ function PedidoWizard({
       ...prev,
       {
         descripcion_item: '',
-        prenda: '',
-        talla: '',
-        color_prenda: '',
-        ubicacion: '',
-        puntadas_estimadas: 0,
-        cantidad: 1,
         precio_unitario: 0,
-        observaciones: '',
+        importe: 0,
       },
     ])
   }
@@ -416,9 +436,11 @@ function PedidoWizard({
     const payload: PedidoForm = {
       ...formState,
       subtotal,
+      descuento,
+      impuestos,
       total,
       saldo,
-      items: items.map((item) => ({ ...item, importe: item.cantidad * item.precio_unitario })),
+      items,
     }
     await onSubmit(payload)
   }
@@ -537,43 +559,10 @@ function PedidoWizard({
               <div key={index} className="rounded-2xl border border-slate-200 p-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
-                    Descripción libre
+                    Descripción
                     <Input
                       value={item.descripcion_item}
                       onChange={(event) => updateItem(index, 'descripcion_item', event.target.value)}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Prenda
-                    <Input value={item.prenda} onChange={(event) => updateItem(index, 'prenda', event.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Talla
-                    <Input value={item.talla} onChange={(event) => updateItem(index, 'talla', event.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Color
-                    <Input value={item.color_prenda} onChange={(event) => updateItem(index, 'color_prenda', event.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Ubicación
-                    <Input value={item.ubicacion} onChange={(event) => updateItem(index, 'ubicacion', event.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Puntadas estimadas
-                    <Input
-                      type="number"
-                      value={item.puntadas_estimadas}
-                      onChange={(event) => updateItem(index, 'puntadas_estimadas', Number(event.target.value))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Cantidad
-                    <Input
-                      type="number"
-                      min={1}
-                      value={item.cantidad}
-                      onChange={(event) => updateItem(index, 'cantidad', Number(event.target.value))}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -585,8 +574,11 @@ function PedidoWizard({
                       onChange={(event) => updateItem(index, 'precio_unitario', Number(event.target.value))}
                     />
                   </label>
+                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                    Importe total
+                    <Input type="number" readOnly value={item.importe.toFixed(2)} />
+                  </label>
                 </div>
-                <p className="mt-2 text-xs text-slate-500">Importe: {formatCurrency(item.cantidad * item.precio_unitario)}</p>
               </div>
             ))}
             <Button type="button" variant="outline" onClick={addItem} className="w-full sm:w-auto">
@@ -603,24 +595,6 @@ function PedidoWizard({
                 <Input type="number" readOnly value={subtotal.toFixed(2)} />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                Descuento
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formState.descuento}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, descuento: Number(event.target.value) }))}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Impuestos
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formState.impuestos}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, impuestos: Number(event.target.value) }))}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
                 Anticipo
                 <Input
                   type="number"
@@ -630,6 +604,60 @@ function PedidoWizard({
                 />
                 <span className="text-xs text-slate-500">Sugerido: {formatCurrency(anticipoSugerido)}</span>
               </label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border border-slate-300"
+                    checked={descuentoActivo}
+                    onChange={(event) => {
+                      const checked = event.target.checked
+                      setDescuentoActivo(checked)
+                      if (!checked) {
+                        setDescuentoPorcentaje(0)
+                      }
+                    }}
+                  />
+                  Descuento (%)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={100}
+                  value={descuentoPorcentaje}
+                  onChange={(event) => {
+                    const raw = Number(event.target.value)
+                    if (Number.isNaN(raw)) {
+                      setDescuentoPorcentaje(0)
+                      return
+                    }
+                    setDescuentoPorcentaje(Math.min(Math.max(raw, 0), 100))
+                  }}
+                  disabled={!descuentoActivo}
+                  placeholder="0"
+                />
+                <span className="text-xs text-slate-500">
+                  Aplicado: {formatCurrency(descuento)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border border-slate-300"
+                    checked={impuestosActivos}
+                    onChange={(event) => setImpuestosActivos(event.target.checked)}
+                  />
+                  Impuestos (IVA 16%)
+                </label>
+                <Input type="number" readOnly value={impuestos.toFixed(2)} disabled={!impuestosActivos} />
+                <span className="text-xs text-slate-500">
+                  Calculado sobre el subtotal con descuento.
+                </span>
+              </div>
             </div>
             <Alert
               variant={formState.anticipo >= anticipoSugerido ? 'success' : 'warning'}
@@ -651,18 +679,16 @@ function PedidoWizard({
               <ul className="mt-2 space-y-2 text-xs text-slate-600">
                 {items.map((item, index) => (
                   <li key={index} className="flex items-center justify-between">
-                    <span>
-                      {item.descripcion_item} · {item.cantidad} x {formatCurrency(item.precio_unitario)}
-                    </span>
-                    <span>{formatCurrency(item.cantidad * item.precio_unitario)}</span>
+                    <span>{item.descripcion_item}</span>
+                    <span>{formatCurrency(item.importe)}</span>
                   </li>
                 ))}
               </ul>
             </div>
             <div className="text-xs text-slate-500">
               <p>Subtotal: {formatCurrency(subtotal)}</p>
-              <p>Descuento: {formatCurrency(formState.descuento)}</p>
-              <p>Impuestos: {formatCurrency(formState.impuestos)}</p>
+              <p>Descuento: {formatCurrency(descuento)}</p>
+              <p>Impuestos: {formatCurrency(impuestos)}</p>
               <p className="font-semibold text-slate-700">Total: {formatCurrency(total)}</p>
               <p>Anticipo: {formatCurrency(formState.anticipo)}</p>
               <p>Saldo: {formatCurrency(saldo)}</p>

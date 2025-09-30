@@ -54,19 +54,11 @@ export async function createPedido(values: PedidoForm, usuarioId: string) {
 
   const batch = writeBatch(db)
   values.items.forEach((item) => {
-    const importe = item.cantidad * item.precio_unitario
     const itemRef = doc(pedidoItemsCollection(pedidoDoc.id))
     batch.set(itemRef, {
       descripcion_item: item.descripcion_item,
-      prenda: item.prenda,
-      talla: item.talla,
-      color_prenda: item.color_prenda,
-      ubicacion: item.ubicacion,
-      puntadas_estimadas: item.puntadas_estimadas,
-      cantidad: item.cantidad,
       precio_unitario: item.precio_unitario,
-      importe,
-      observaciones: item.observaciones ?? '',
+      importe: item.importe,
     })
   })
   await batch.commit()
