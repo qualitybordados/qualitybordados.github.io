@@ -11,6 +11,10 @@ import {
   where,
   serverTimestamp,
   writeBatch,
+  FirestoreError,
+  QueryDocumentSnapshot,
+  DocumentData,
+  DocumentReference,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { Abono, MovimientoCaja, Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
@@ -63,24 +67,67 @@ export async function fetchPedidoItems(pedidoId: string) {
 
 export async function fetchPedidoAbonos(pedidoId: string) {
   const pedidoRef = doc(db, 'pedidos', pedidoId)
-  const q = query(abonosCollection, where('pedido_id', '==', pedidoRef), orderBy('fecha', 'desc'))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((docSnap) => {
+
+  const mapAbonoDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Abono => {
     const data = docSnap.data()
     return {
       id: docSnap.id,
-      pedido_id: data.pedido_id,
-      cliente_id: data.cliente_id,
-      fecha: data.fecha,
-      monto: data.monto,
+      pedido_id: data.pedido_id as DocumentReference,
+      cliente_id: data.cliente_id as DocumentReference,
+      fecha: data.fecha as Timestamp,
+      monto: data.monto as number,
       metodo: data.metodo,
-      ref: data.ref ?? '',
-      notas: data.notas ?? '',
-      registrado_por: data.registrado_por,
-      creado_en: data.creado_en,
-      ...(data.movimiento_caja_id ? { movimiento_caja_id: data.movimiento_caja_id } : {}),
-    } satisfies Abono
+      ref: (data.ref ?? '') as string,
+      notas: (data.notas ?? '') as string,
+      registrado_por: data.registrado_por as string,
+      creado_en: data.creado_en as Timestamp,
+      ...(data.movimiento_caja_id ? { movimiento_caja_id: data.movimiento_caja_id as DocumentReference } : {}),
+    }
+  }
+
+  const isMissingIndexError = (error: unknown): error is FirestoreError =>
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in (error as Record<string, unknown>) &&
+    (error as FirestoreError).code === 'failed-precondition'
+
+  const isInvalidValueError = (error: unknown): error is FirestoreError =>
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in (error as Record<string, unknown>) &&
+    (error as FirestoreError).code === 'invalid-argument'
+
+  async function fetchByPedidoId(value: DocumentReference | string) {
+    const results: QueryDocumentSnapshot<DocumentData>[] = []
+    try {
+      const snapshot = await getDocs(query(abonosCollection, where('pedido_id', '==', value), orderBy('fecha', 'desc')))
+      results.push(...snapshot.docs)
+    } catch (error) {
+      if (isMissingIndexError(error)) {
+        const snapshot = await getDocs(query(abonosCollection, where('pedido_id', '==', value)))
+        results.push(...snapshot.docs)
+      } else if (isInvalidValueError(error)) {
+        return results
+      } else {
+        throw error
+      }
+    }
+    return results
+  }
+
+  const snapshots = await Promise.all([
+    fetchByPedidoId(pedidoRef),
+    fetchByPedidoId(pedidoId),
+    fetchByPedidoId(pedidoRef.path),
+  ])
+
+  const abonosMap = new Map<string, Abono>()
+  snapshots.flat().forEach((docSnap) => {
+    const abono = mapAbonoDoc(docSnap)
+    abonosMap.set(abono.id, abono)
   })
+
+  return Array.from(abonosMap.values()).sort((a, b) => b.fecha.toMillis() - a.fecha.toMillis())
 }
 
 function buildPedidoPayload(values: PedidoForm, usuarioId: string) {
