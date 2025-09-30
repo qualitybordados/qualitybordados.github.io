@@ -39,6 +39,7 @@ function extractClienteId(value: unknown): string {
 
 export async function fetchDashboardData() {
   const now = dayjs()
+  const nowDate = now.toDate()
   const tresDias = now.add(3, 'day').toDate()
   const sieteDiasAtras = now.subtract(7, 'day').toDate()
 
@@ -47,16 +48,12 @@ export async function fetchDashboardData() {
   const activosSnap = await getDocs(query(pedidosRef, where('status', 'in', estadosActivos)))
   const pedidosActivos = activosSnap.size
 
-  const proximasEntregasSnap = await getDocs(
-    query(pedidosRef, where('status', 'in', estadosActivos), where('fecha_compromiso', '<=', Timestamp.fromDate(tresDias))),
-  )
-  const entregasProximas = proximasEntregasSnap.size
-  const proximasEntregasRaw = proximasEntregasSnap.docs
+  const proximasEntregasRaw = activosSnap.docs
     .map((docSnap) => {
       const data = docSnap.data() as Omit<Pedido, 'id'>
       const fechaCompromiso = normalizeToDate(data.fecha_compromiso as unknown)
 
-      if (!fechaCompromiso) {
+      if (!fechaCompromiso || fechaCompromiso > tresDias) {
         return null
       }
 
@@ -76,6 +73,8 @@ export async function fetchDashboardData() {
       status: Pedido['status']
     } => pedido !== null)
 
+  const entregasProximas = proximasEntregasRaw.length
+
   const clienteIds = Array.from(new Set(proximasEntregasRaw.map((pedido) => pedido.clienteId).filter(Boolean)))
   const clienteAliasEntries = await Promise.all(
     clienteIds.map(async (clienteId) => {
@@ -89,16 +88,22 @@ export async function fetchDashboardData() {
   )
   const clienteAliasMap = new Map(clienteAliasEntries)
 
-  const proximasEntregas = proximasEntregasRaw.map(({ clienteId, ...pedido }) => ({
-    ...pedido,
-    cliente: clienteAliasMap.get(clienteId) ?? clienteId,
-  }))
+  const proximasEntregas = proximasEntregasRaw
+    .map(({ clienteId, ...pedido }) => ({
+      ...pedido,
+      cliente: clienteAliasMap.get(clienteId) ?? clienteId,
+    }))
+    .sort((a, b) => a.fecha_compromiso.getTime() - b.fecha_compromiso.getTime())
 
-  const carteraVencidaSnap = await getDocs(
-    query(pedidosRef, where('saldo', '>', 0), where('fecha_compromiso', '<', Timestamp.fromDate(now.toDate()))),
-  )
+  const carteraVencidaSnap = await getDocs(query(pedidosRef, where('saldo', '>', 0)))
   const carteraVencida = carteraVencidaSnap.docs.reduce((sum, docSnap) => {
     const data = docSnap.data() as Omit<Pedido, 'id'>
+    const fechaCompromiso = normalizeToDate(data.fecha_compromiso as unknown)
+
+    if (!fechaCompromiso || fechaCompromiso >= nowDate) {
+      return sum
+    }
+
     return sum + data.saldo
   }, 0)
 
