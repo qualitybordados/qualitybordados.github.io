@@ -69,6 +69,10 @@ export default function PedidosPage() {
   const eliminarPedido = useEliminarPedido()
   const { data: clientesData } = useClientes({}, { enabled: authReady })
   const { data: config } = useConfiguracion({ enabled: authReady })
+  const clientesMap = useMemo(() => {
+    if (!clientesData) return new Map<string, string>()
+    return new Map(clientesData.map((cliente) => [cliente.id, cliente.alias]))
+  }, [clientesData])
 
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null)
@@ -134,6 +138,7 @@ export default function PedidosPage() {
           pedidos.map((pedido) => {
             const estadoIndex = estadosPedido.indexOf(pedido.status)
             const siguienteEstado = estadosPedido[estadoIndex + 1]
+            const clienteNombre = clientesMap.get(pedido.cliente_id.id) ?? pedido.cliente_id.id
             return (
               <PedidoCard
                 key={pedido.id}
@@ -145,6 +150,7 @@ export default function PedidosPage() {
                 onEdit={() => abrirEdicion(pedido)}
                 onDelete={() => handleEliminarPedido(pedido)}
                 allowActions={puedeEditar}
+                clienteNombre={clienteNombre}
               />
             )
           })
@@ -236,6 +242,7 @@ function PedidoCard({
   onEdit,
   onDelete,
   allowActions,
+  clienteNombre,
 }: {
   pedido: Pedido
   onClick: () => void
@@ -245,6 +252,7 @@ function PedidoCard({
   onEdit: () => void
   onDelete: () => void
   allowActions: boolean
+  clienteNombre: string
 }) {
   const fechaCompromiso = pedido.fecha_compromiso.toDate()
   const diasRestantes = dayjs(fechaCompromiso).diff(dayjs(), 'day')
@@ -301,7 +309,7 @@ function PedidoCard({
       <div className="mt-4 space-y-2 text-sm text-slate-600">
         <div className="flex flex-wrap items-center gap-2 text-slate-500">
           <User className="h-4 w-4 text-slate-400" />
-          {pedido.cliente_id.id}
+          {clienteNombre}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-slate-500">
@@ -386,6 +394,10 @@ function PedidoWizard({
   const saldo = useMemo(() => Math.max(Number((total - formState.anticipo).toFixed(2)), 0), [total, formState.anticipo])
   const anticipoSugerido = useMemo(() => Number(((total * anticipoMinimo) / 100).toFixed(2)), [total, anticipoMinimo])
   const hasClientes = clientes.length > 0
+  const clienteSeleccionado = useMemo(
+    () => clientes.find((cliente) => cliente.id === formState.cliente_id) ?? null,
+    [clientes, formState.cliente_id],
+  )
 
   function updateItem(index: number, field: keyof PedidoItemForm, value: string | number) {
     setItems((prev) =>
@@ -672,7 +684,7 @@ function PedidoWizard({
             <Alert
               variant="default"
               title="Resumen del pedido"
-              description={`Folio: ${formState.folio} — Cliente ${formState.cliente_id}`}
+              description={`Folio: ${formState.folio} — Cliente ${clienteSeleccionado?.alias ?? formState.cliente_id}`}
             />
             <div>
               <p className="font-medium text-slate-600">Items</p>

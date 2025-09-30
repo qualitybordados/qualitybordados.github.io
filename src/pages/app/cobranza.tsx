@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePedidosConSaldo, useRegistrarAbono } from '@/features/cobranza/hooks'
+import { useClientes } from '@/features/clientes/hooks'
 import { useEliminarPedido, useUpdatePedido } from '@/features/pedidos/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -33,6 +34,11 @@ export default function CobranzaPage() {
   const { data: pedidos, isLoading, isFetching } = usePedidosConSaldo({ enabled: authReady })
   const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const registrarAbono = useRegistrarAbono()
+  const { data: clientes } = useClientes({}, { enabled: authReady })
+  const clientesMap = useMemo(() => {
+    if (!clientes) return new Map<string, string>()
+    return new Map(clientes.map((cliente) => [cliente.id, cliente.alias]))
+  }, [clientes])
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<Pedido | null>(null)
   const updatePedido = useUpdatePedido()
   const eliminarPedido = useEliminarPedido()
@@ -89,6 +95,7 @@ export default function CobranzaPage() {
               onEdit={() => abrirEdicionPedido(pedido)}
               onDelete={() => handleEliminarPedido(pedido)}
               allowActions={puedeRegistrar}
+              clienteNombre={clientesMap.get(pedido.cliente_id.id) ?? pedido.cliente_id.id}
             />
           ))
         ) : (
@@ -153,6 +160,7 @@ function CobranzaCard({
   onEdit,
   onDelete,
   allowActions,
+  clienteNombre,
 }: {
   pedido: Pedido
   onRegistrar: () => void
@@ -160,6 +168,7 @@ function CobranzaCard({
   onEdit: () => void
   onDelete: () => void
   allowActions: boolean
+  clienteNombre: string
 }) {
   const fecha = pedido.fecha_compromiso.toDate()
   const diasVencidos = dayjs().diff(fecha, 'day')
@@ -172,7 +181,7 @@ function CobranzaCard({
           <p className="text-sm font-semibold text-slate-900">Folio {pedido.folio}</p>
           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
             <User className="h-4 w-4 text-slate-400" />
-            {pedido.cliente_id.id}
+            {clienteNombre}
           </div>
         </div>
         <div className="flex items-center gap-2">
