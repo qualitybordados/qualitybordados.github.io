@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/index.mjs dev-publish-watch",
+    "dev:server": "vite",
     "dev:publish:watch": "node scripts/index.mjs dev-publish-watch",
     "clean": "node scripts/index.mjs clean",
     "build": "tsc && vite build",

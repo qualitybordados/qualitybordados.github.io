@@ -37,12 +37,14 @@ function stampToDate(stamp) {
   const day = Number(datePart.slice(6, 8))
   const hours = Number(timePart.slice(0, 2))
   const minutes = Number(timePart.slice(2, 4))
+  const secondsPart = timePart.slice(4, 6)
+  const seconds = secondsPart ? Number(secondsPart) : 0
 
-  if ([year, month, day, hours, minutes].some(Number.isNaN)) {
+  if ([year, month, day, hours, minutes, seconds].some(Number.isNaN)) {
     return null
   }
 
-  return new Date(year, month, day, hours, minutes)
+  return new Date(year, month, day, hours, minutes, seconds)
 }
 
 function ensureFutureStamp(candidate, reference) {
@@ -55,7 +57,7 @@ function ensureFutureStamp(candidate, reference) {
   }
 
   const parsed = stampToDate(reference) ?? new Date()
-  parsed.setMinutes(parsed.getMinutes() + 1)
+  parsed.setSeconds(parsed.getSeconds() + 1)
   return formatStamp(parsed)
 }
 
@@ -177,7 +179,12 @@ export async function publishDocs() {
   cachedFirebaseConfig = firebaseConfig
   await syncDocsManifest()
   await syncDocsMeta()
-  console.log('📤 docs/ sincronizado con dist/')
+  console.log(`📤 docs/ sincronizado con dist/ → main: ${mainBundle}, css: ${cssBundle}`)
+
+  return {
+    mainBundle,
+    cssBundle,
+  }
 }
 
 function getHtmlMatch(html, regex, notFoundMessage) {
@@ -297,7 +304,11 @@ export async function verifyDocs(options = {}) {
   }
 
   logSuccess('✅ Verificación', referencedMain, dataBuild ?? '(pendiente)')
-  console.log(`🌐 ${SITE_URL} @ ${dataBuild ?? 'pendiente'}`)
+  if (dataBuild) {
+    console.log(`🌐 ${SITE_URL}?v=${dataBuild}`)
+  } else {
+    console.log(`🌐 ${SITE_URL} @ pendiente`)
+  }
 
   return {
     mainJsFile: referencedMain,
@@ -409,15 +420,19 @@ export async function release() {
   console.log('🚀 Ejecutando pipeline release')
   await cleanDocs()
   await runCommand('npm', ['run', 'build'])
-  await publishDocs()
+  const publishInfo = await publishDocs()
   await verifyDocs({ allowStale: true })
   const bustInfo = await versionBust()
   const verification = await verifyDocs()
+  const noJekyllExists = await pathExists(paths.docs('.nojekyll'))
 
   console.log(`📁 docs/: ${path.relative(rootDir, paths.docs()) || 'docs'}`)
   console.log(`🧩 main bundle: ${verification.mainJsFile}`)
+  console.log(`📦 dist/assets → main: ${publishInfo.mainBundle}`)
+  console.log(`🔗 docs/index.html → assets/${verification.mainJsFile}`)
   console.log(`🏷️ data-build: ${verification.dataBuild}`)
-  console.log(`🌐 ${SITE_URL} @ ${verification.dataBuild}`)
+  console.log(`🌐 ${SITE_URL}?v=${verification.dataBuild}`)
+  console.log(`📎 docs/.nojekyll ${noJekyllExists ? 'verificado' : 'faltante'}`)
 
   return {
     ...verification,
@@ -429,43 +444,78 @@ export async function devPublishWatch() {
   const chokidarModule = await import('chokidar')
   const chokidar = chokidarModule.watch ? chokidarModule : chokidarModule.default
 
-  const dev = spawnCommand('npm', ['run', 'dev'], { stdio: 'inherit' })
+  const dev = spawnCommand('npm', ['run', 'dev:server'], { stdio: 'inherit' })
 
   let running = false
-  let queued = false
+  let queuedReason = null
   let watcher
 
-  async function syncDocs(reason) {
+  const watchTargets = [
+    paths.root('src/**/*'),
+    paths.root('public/**/*'),
+    paths.root('scripts/**/*.{mjs,js,ts}'),
+    paths.root('package.json'),
+    paths.root('tsconfig.json'),
+    paths.root('tsconfig.node.json'),
+    paths.root('tailwind.config.js'),
+    paths.root('postcss.config.js'),
+    paths.root('vite.config.ts'),
+  ]
+
+  async function syncDocs(reason, detail = '') {
     if (running) {
-      queued = true
+      queuedReason = detail || reason
       return
     }
 
     running = true
-    console.log(`🔄 Re-sync docs/ (${reason})`)
+    const startedAt = Date.now()
+    const startIso = new Date().toISOString()
+    const suffix = detail ? ` (${detail})` : ''
+    console.log(`⚙️ ${startIso} → rebuilding ${reason}${suffix}`)
     try {
       await runCommand('npm', ['run', 'build'])
       await publishDocs()
+      await verifyDocs({ allowStale: true })
+      const bustInfo = await versionBust()
+      const verification = await verifyDocs()
+      const duration = ((Date.now() - startedAt) / 1000).toFixed(2)
+      console.log(
+        `✅ docs actualizado en ${duration}s → main: ${verification.mainJsFile} | data-build: ${verification.dataBuild}`,
+      )
+      if (bustInfo.serviceWorkers.length) {
+        console.log(`⚙️ APP_VERSION actualizado en: ${bustInfo.serviceWorkers.join(', ')}`)
+      }
+      console.log(`🕒 Última sync completada @ ${new Date().toISOString()}`)
     } catch (error) {
-      console.error('❌ Error al sincronizar docs/:', error.message)
+      const message = error instanceof Error ? error.stack ?? error.message : error
+      console.error('❌ Error al sincronizar docs/:', message)
+      console.error('🔁 El watcher sigue activo. Corrige el error y guarda un archivo para reintentar.')
     } finally {
       running = false
-      if (queued) {
-        queued = false
-        await syncDocs('cambios adicionales')
+      if (queuedReason) {
+        const nextReason = queuedReason
+        queuedReason = null
+        await syncDocs('cambios adicionales', nextReason)
       }
     }
   }
 
   await syncDocs('inicio')
 
-  watcher = chokidar.watch(paths.root('src/**/*.{ts,tsx,js,jsx,css,scss,sass,less,pcss}'), {
+  watcher = chokidar.watch(watchTargets, {
     ignoreInitial: true,
   })
 
+  watcher.on('ready', () => {
+    console.log('👂 Watcher activo en src/, public/ y configuraciones clave.')
+  })
+
   watcher.on('all', (event, filePath) => {
-    console.log(`👀 Cambio detectado (${event}): ${path.relative(rootDir, filePath)}`)
-    void syncDocs('cambio en src/')
+    const relative = path.relative(rootDir, filePath)
+    const iso = new Date().toISOString()
+    console.log(`👀 ${iso} detecté cambio (${event}) en ${relative}`)
+    void syncDocs('cambio detectado', `${event} ${relative}`)
   })
 
   const shutdown = async (signal = 'SIGTERM') => {
