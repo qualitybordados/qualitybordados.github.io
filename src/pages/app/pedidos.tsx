@@ -21,6 +21,7 @@ import {
   usePedidoItems,
   usePedidoAbonos,
 } from '@/features/pedidos/hooks'
+import { useRegistrarAbono } from '@/features/cobranza/hooks'
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
 import { useAuth } from '@/hooks/use-auth'
@@ -42,6 +43,7 @@ import {
   FileDown,
   Share2,
   MessageCircle,
+  Wallet,
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { Input } from '@/components/ui/input'
@@ -49,6 +51,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { PedidoForm, PedidoItemForm } from '@/lib/validators'
 import { clsx } from 'clsx'
 import { generatePedidoPdf } from '@/features/pedidos/pdf'
+import { AbonoDialogForm } from '@/components/common/abono-dialog-form'
 
 const estadosPedido: PedidoEstado[] = [
   'COTIZACIÓN',
@@ -89,6 +92,7 @@ export default function PedidosPage() {
   const actualizarEstado = useActualizarEstadoPedido()
   const updatePedido = useUpdatePedido()
   const eliminarPedido = useEliminarPedido()
+  const registrarAbono = useRegistrarAbono()
   const { data: clientesData } = useClientes({}, { enabled: authReady })
   const { data: config } = useConfiguracion({ enabled: authReady })
   const clientesMap = useMemo(() => {
@@ -99,6 +103,7 @@ export default function PedidosPage() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null)
   const [pedidoEdicion, setPedidoEdicion] = useState<Pedido | null>(null)
+  const [pedidoAbono, setPedidoAbono] = useState<Pedido | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
   const {
     data: pedidoItemsEdicion,
@@ -133,6 +138,7 @@ export default function PedidosPage() {
   const puedeCrear = ['OWNER', 'ADMIN', 'VENTAS'].includes(role ?? '')
   const puedeActualizarEstado = ['OWNER', 'ADMIN', 'PRODUCCION'].includes(role ?? '')
   const puedeEditar = puedeCrear
+  const puedeRegistrarAbonos = ['OWNER', 'ADMIN', 'COBRANZA', 'VENTAS'].includes(role ?? '')
 
   async function handleCambioEstado(pedidoId: string, estado: PedidoEstado) {
     if (!user) return
@@ -214,6 +220,8 @@ export default function PedidosPage() {
                 onEdit={() => abrirEdicion(pedido)}
                 onDelete={() => handleEliminarPedido(pedido)}
                 allowActions={puedeEditar}
+                allowRegistrarAbono={puedeRegistrarAbonos}
+                onRegistrarAbono={() => setPedidoAbono(pedido)}
                 clienteNombre={clienteNombre}
               />
             )
@@ -298,6 +306,23 @@ export default function PedidosPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!pedidoAbono} onOpenChange={(open) => !open && setPedidoAbono(null)}>
+        <DialogContent>
+          {pedidoAbono ? (
+            <AbonoDialogForm
+              pedido={pedidoAbono}
+              onClose={() => setPedidoAbono(null)}
+              onSubmit={async (values) => {
+                if (!user) return
+                await registrarAbono.mutateAsync({ data: values, usuarioId: user.uid })
+                setPedidoAbono(null)
+              }}
+              isSubmitting={registrarAbono.isPending}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!detallePedido} onOpenChange={(open) => !open && setDetallePedido(null)}>
         <DialogContent>
           {detallePedido ? (
@@ -333,6 +358,8 @@ function PedidoCard({
   onEdit,
   onDelete,
   allowActions,
+  allowRegistrarAbono,
+  onRegistrarAbono,
   clienteNombre,
 }: {
   pedido: Pedido
@@ -345,6 +372,8 @@ function PedidoCard({
   onEdit: () => void
   onDelete: () => void
   allowActions: boolean
+  allowRegistrarAbono: boolean
+  onRegistrarAbono: () => void
   clienteNombre: string
 }) {
   const fechaCompromiso = pedido.fecha_compromiso.toDate()
@@ -368,6 +397,22 @@ function PedidoCard({
           <Badge variant={prioridadVariant} className="text-xs uppercase">
             {pedido.prioridad}
           </Badge>
+          {allowRegistrarAbono ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 border border-slate-200 text-emerald-600"
+              onClick={(event) => {
+                event.stopPropagation()
+                onRegistrarAbono()
+              }}
+              disabled={pedido.saldo <= 0}
+              aria-label="Registrar abono"
+              title={pedido.saldo > 0 ? 'Registrar abono' : 'Pedido sin saldo pendiente'}
+            >
+              <Wallet className="h-4 w-4" />
+            </Button>
+          ) : null}
           {allowActions ? (
             <>
               <Button
@@ -943,7 +988,7 @@ function DetallePedido({
   const fechaPedidoLabel = dayjs(pedido.fecha_pedido.toDate()).format('DD/MM/YYYY')
   const telefonoCliente = cliente?.telefono ?? ''
   const telefonoDigits = telefonoCliente.replace(/\D/g, '')
-  const totalAbonos = useMemo(() => abonosList.reduce((sum, abono) => sum + abono.monto, 0), [abonosList])
+  const totalAbonos = useMemo(() => (abonos ?? []).reduce((sum, abono) => sum + abono.monto, 0), [abonos])
   const currencyTextFormatter = useMemo(
     () =>
       new Intl.NumberFormat('es-MX', {
