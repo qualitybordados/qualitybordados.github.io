@@ -84,6 +84,7 @@ export interface Abono {
   notas: string
   registrado_por: string
   creado_en: Timestamp
+  movimiento_caja_id?: DocumentReference
 }
 
 export type MovimientoTipo = 'INGRESO' | 'EGRESO'
@@ -95,6 +96,7 @@ export interface MovimientoCaja {
   categoria: string
   monto: number
   referencia_pedido_id?: DocumentReference
+  referencia_abono_id?: DocumentReference
   notas: string
   registrado_por: string
   creado_en: Timestamp
