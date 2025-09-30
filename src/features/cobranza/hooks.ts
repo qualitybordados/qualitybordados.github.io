@@ -21,9 +21,10 @@ export function useRegistrarAbono() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: { data: AbonoForm; usuarioId: string }) => registrarAbonoPedido(payload.data, payload.usuarioId),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: COBRANZA_KEY })
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.invalidateQueries({ queryKey: ['pedidos', 'abonos', variables.data.pedido_id] })
     },
   })
 }
