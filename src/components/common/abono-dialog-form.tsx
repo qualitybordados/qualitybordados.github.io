@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,8 +31,13 @@ export function AbonoDialogForm({ pedido, onSubmit, onClose, isSubmitting }: Abo
   const [fecha, setFecha] = useState(dayjs().format('YYYY-MM-DD'))
   const [monto, setMonto] = useState(pedido.saldo)
   const [metodo, setMetodo] = useState<MetodoPago>('EFECTIVO')
-  const [referencia, setReferencia] = useState('')
+  const [referencia, setReferencia] = useState(pedido.folio)
   const [notas, setNotas] = useState('')
+
+  useEffect(() => {
+    setMonto(pedido.saldo)
+    setReferencia(pedido.folio)
+  }, [pedido])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
