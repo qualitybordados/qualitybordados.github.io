@@ -1,6 +1,20 @@
-import { Timestamp, addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, updateDoc, where, serverTimestamp, writeBatch } from 'firebase/firestore'
+import {
+  Timestamp,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  updateDoc,
+  where,
+  serverTimestamp,
+  writeBatch,
+} from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { Pedido, PedidoEstado, ProduccionEvento } from '@/lib/types'
+import { Pedido, PedidoEstado, PedidoItem, ProduccionEvento } from '@/lib/types'
 import { PedidoForm } from '@/lib/validators'
 import { movimientosCajaCollection, pedidoItemsCollection, registrarBitacora } from '@/lib/firestore'
 
@@ -25,6 +39,21 @@ export async function fetchPedidos(params?: {
   const q = query(pedidosRef, ...conditions, orderBy('fecha_compromiso', 'desc'), limit(100))
   const snapshot = await getDocs(q)
   return snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Pedido, 'id'>) }))
+}
+
+export async function fetchPedidoItems(pedidoId: string) {
+  const snapshot = await getDocs(pedidoItemsCollection(pedidoId))
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data()
+    const cantidad = data.cantidad ?? (data.precio_unitario ? Number((data.importe / data.precio_unitario).toFixed(2)) : 1)
+    return {
+      id: docSnap.id,
+      descripcion_item: data.descripcion_item,
+      cantidad,
+      precio_unitario: data.precio_unitario,
+      importe: data.importe,
+    } satisfies PedidoItem
+  })
 }
 
 function buildPedidoPayload(values: PedidoForm, usuarioId: string) {
@@ -57,6 +86,7 @@ export async function createPedido(values: PedidoForm, usuarioId: string) {
     const itemRef = doc(pedidoItemsCollection(pedidoDoc.id))
     batch.set(itemRef, {
       descripcion_item: item.descripcion_item,
+      cantidad: item.cantidad,
       precio_unitario: item.precio_unitario,
       importe: item.importe,
     })
@@ -115,6 +145,27 @@ export async function updatePedido(id: string, values: Partial<PedidoForm>, usua
   } else {
     delete payload.fecha_compromiso
   }
+
+  if (values.items) {
+    const batch = writeBatch(db)
+    const itemsRef = pedidoItemsCollection(id)
+    const existingItems = await getDocs(itemsRef)
+    existingItems.forEach((itemDoc) => {
+      batch.delete(itemDoc.ref)
+    })
+    values.items.forEach((item) => {
+      const itemRef = doc(itemsRef)
+      batch.set(itemRef, {
+        descripcion_item: item.descripcion_item,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        importe: item.importe,
+      })
+    })
+    delete payload.items
+    await batch.commit()
+  }
+
   await updateDoc(pedidoDoc, payload)
 
   await registrarBitacora({

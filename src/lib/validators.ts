@@ -19,6 +19,7 @@ export const clienteSchema = z.object({
 
 export const pedidoItemSchema = z.object({
   descripcion_item: z.string().min(3),
+  cantidad: z.coerce.number().int().min(1),
   precio_unitario: z.coerce.number().min(0).multipleOf(0.01),
   importe: z.coerce.number().min(0).multipleOf(0.01),
 })
