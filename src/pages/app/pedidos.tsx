@@ -25,6 +25,7 @@ import { useConfiguracion } from '@/features/configuracion/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { Cliente, Pedido, PedidoEstado, Prioridad } from '@/lib/types'
+import { getDocumentId } from '@/lib/firestore'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
 import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight, ChevronLeft, Pencil, Trash } from 'lucide-react'
@@ -93,7 +94,7 @@ export default function PedidosPage() {
     if (!pedidoEdicion || !pedidoItemsEdicion) return null
     return {
       folio: pedidoEdicion.folio,
-      cliente_id: pedidoEdicion.cliente_id.id,
+      cliente_id: getDocumentId(pedidoEdicion.cliente_id),
       fecha_pedido: pedidoEdicion.fecha_pedido.toDate(),
       fecha_compromiso: pedidoEdicion.fecha_compromiso.toDate(),
       status: pedidoEdicion.status,
@@ -183,7 +184,8 @@ export default function PedidosPage() {
             const estadoIndex = estadosPedido.indexOf(pedido.status)
             const siguienteEstado = estadosPedido[estadoIndex + 1]
             const anteriorEstado = estadosPedido[estadoIndex - 1]
-            const clienteNombre = clientesMap.get(pedido.cliente_id.id) ?? pedido.cliente_id.id
+            const clienteId = getDocumentId(pedido.cliente_id)
+            const clienteNombre = clientesMap.get(clienteId) ?? clienteId
             return (
               <PedidoCard
                 key={pedido.id}

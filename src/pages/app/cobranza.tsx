@@ -5,6 +5,7 @@ import { useClientes } from '@/features/clientes/hooks'
 import { useEliminarPedido, useUpdatePedido } from '@/features/pedidos/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { getDocumentId } from '@/lib/firestore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -95,7 +96,9 @@ export default function CobranzaPage() {
               onEdit={() => abrirEdicionPedido(pedido)}
               onDelete={() => handleEliminarPedido(pedido)}
               allowActions={puedeRegistrar}
-              clienteNombre={clientesMap.get(pedido.cliente_id.id) ?? pedido.cliente_id.id}
+              clienteNombre={
+                clientesMap.get(getDocumentId(pedido.cliente_id)) ?? getDocumentId(pedido.cliente_id)
+              }
             />
           ))
         ) : (
@@ -259,7 +262,7 @@ function AbonoDialogForm({
     event.preventDefault()
     await onSubmit({
       pedido_id: pedido.id,
-      cliente_id: pedido.cliente_id.id,
+      cliente_id: getDocumentId(pedido.cliente_id),
       fecha: dayjs(fecha).toDate(),
       monto,
       metodo,

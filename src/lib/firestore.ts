@@ -1,4 +1,12 @@
-import { addDoc, collection, CollectionReference, doc, DocumentReference, serverTimestamp, Timestamp } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  CollectionReference,
+  doc,
+  DocumentReference,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { Abono, Cliente, MovimientoCaja, Pedido, PedidoItem, ProduccionEvento, BitacoraEntrada } from '@/lib/types'
 
@@ -31,4 +39,27 @@ export async function registrarBitacora(entrada: Omit<BitacoraEntrada, 'id' | 't
     ...entrada,
     timestamp: serverTimestamp() as Timestamp,
   })
+}
+
+type DocumentReferenceLike = DocumentReference | { id: string } | string | null | undefined
+
+export function getDocumentId(reference: DocumentReferenceLike) {
+  if (!reference) {
+    throw new Error('Referencia de documento inválida')
+  }
+
+  if (typeof reference === 'string') {
+    if (!reference.trim()) {
+      throw new Error('Referencia de documento inválida')
+    }
+
+    const segments = reference.split('/').filter(Boolean)
+    return segments.pop() ?? reference
+  }
+
+  if (typeof reference === 'object' && 'id' in reference && typeof reference.id === 'string') {
+    return reference.id
+  }
+
+  throw new Error('Referencia de documento inválida')
 }
