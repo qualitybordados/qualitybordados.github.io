@@ -1,4 +1,4 @@
-import { Timestamp, collection, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { Timestamp, collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { Pedido } from '@/lib/types'
 import dayjs from 'dayjs'
@@ -51,7 +51,7 @@ export async function fetchDashboardData() {
     query(pedidosRef, where('status', 'in', estadosActivos), where('fecha_compromiso', '<=', Timestamp.fromDate(tresDias))),
   )
   const entregasProximas = proximasEntregasSnap.size
-  const proximasEntregas = proximasEntregasSnap.docs
+  const proximasEntregasRaw = proximasEntregasSnap.docs
     .map((docSnap) => {
       const data = docSnap.data() as Omit<Pedido, 'id'>
       const fechaCompromiso = normalizeToDate(data.fecha_compromiso as unknown)
@@ -63,7 +63,7 @@ export async function fetchDashboardData() {
       return {
         id: docSnap.id,
         folio: data.folio,
-        cliente: extractClienteId(data.cliente_id as unknown),
+        clienteId: extractClienteId(data.cliente_id as unknown),
         fecha_compromiso: fechaCompromiso,
         status: data.status,
       }
@@ -71,10 +71,28 @@ export async function fetchDashboardData() {
     .filter((pedido): pedido is {
       id: string
       folio: string
-      cliente: string
+      clienteId: string
       fecha_compromiso: Date
       status: Pedido['status']
     } => pedido !== null)
+
+  const clienteIds = Array.from(new Set(proximasEntregasRaw.map((pedido) => pedido.clienteId).filter(Boolean)))
+  const clienteAliasEntries = await Promise.all(
+    clienteIds.map(async (clienteId) => {
+      const clienteSnap = await getDoc(doc(db, 'clientes', clienteId))
+      if (!clienteSnap.exists()) {
+        return [clienteId, clienteId] as const
+      }
+      const clienteData = clienteSnap.data() as { alias?: string }
+      return [clienteId, clienteData.alias ?? clienteId] as const
+    }),
+  )
+  const clienteAliasMap = new Map(clienteAliasEntries)
+
+  const proximasEntregas = proximasEntregasRaw.map(({ clienteId, ...pedido }) => ({
+    ...pedido,
+    cliente: clienteAliasMap.get(clienteId) ?? clienteId,
+  }))
 
   const carteraVencidaSnap = await getDocs(
     query(pedidosRef, where('saldo', '>', 0), where('fecha_compromiso', '<', Timestamp.fromDate(now.toDate()))),
