@@ -34,20 +34,63 @@ export async function fetchPedidos(params?: {
   prioridad?: string
   clienteId?: string
 }) {
-  const conditions = []
+  const conditions: ReturnType<typeof where>[] = []
   if (params?.status && params.status !== 'TODOS') {
     conditions.push(where('status', '==', params.status))
   }
   if (params?.prioridad && params.prioridad !== 'TODAS') {
     conditions.push(where('prioridad', '==', params.prioridad))
   }
-  if (params?.clienteId) {
-    conditions.push(where('cliente_id', '==', doc(db, 'clientes', params.clienteId)))
+
+  const pedidosMap = new Map<string, Pedido>()
+  const orderConstraint = orderBy('fecha_compromiso', 'desc')
+  const limitConstraint = limit(100)
+
+  const isFirestoreError = (error: unknown, code: FirestoreError['code']) =>
+    typeof error === 'object' && error !== null && 'code' in (error as Record<string, unknown>) && (error as FirestoreError).code === code
+
+  async function fetchWithConditions(extraCondition?: ReturnType<typeof where>) {
+    const queryConditions = extraCondition ? [...conditions, extraCondition] : [...conditions]
+    try {
+      const snapshot = await getDocs(query(pedidosRef, ...queryConditions, orderConstraint, limitConstraint))
+      return snapshot.docs
+    } catch (error) {
+      if (isFirestoreError(error, 'failed-precondition')) {
+        const snapshot = await getDocs(query(pedidosRef, ...queryConditions, limitConstraint))
+        return snapshot.docs
+      }
+
+      if (isFirestoreError(error, 'invalid-argument')) {
+        return []
+      }
+
+      throw error
+    }
   }
 
-  const q = query(pedidosRef, ...conditions, orderBy('fecha_compromiso', 'desc'), limit(100))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Pedido, 'id'>) }))
+  let snapshots: QueryDocumentSnapshot<DocumentData>[] = []
+
+  if (params?.clienteId) {
+    const clienteRef = doc(db, 'clientes', params.clienteId)
+    const possibleValues: Array<DocumentReference | string> = [clienteRef, clienteRef.path, params.clienteId]
+
+    for (const value of possibleValues) {
+      const docsSnapshot = await fetchWithConditions(where('cliente_id', '==', value))
+      snapshots = snapshots.concat(docsSnapshot)
+    }
+  } else {
+    snapshots = await fetchWithConditions()
+  }
+
+  snapshots.forEach((docSnap) => {
+    const data = docSnap.data() as Omit<Pedido, 'id'>
+    pedidosMap.set(docSnap.id, { id: docSnap.id, ...data })
+  })
+
+  const pedidos = Array.from(pedidosMap.values())
+  pedidos.sort((a, b) => b.fecha_compromiso.toMillis() - a.fecha_compromiso.toMillis())
+
+  return pedidos.slice(0, 100)
 }
 
 export async function fetchPedidoItems(pedidoId: string) {
