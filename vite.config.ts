@@ -15,6 +15,12 @@ export default defineConfig(() => {
       outDir: 'dist',
       emptyOutDir: true,
       manifest: true,
+      minify: 'terser',
+      terserOptions: {
+        format: {
+          comments: false,
+        },
+      },
       rollupOptions: {
         output: {
           entryFileNames: 'assets/main.[hash].js',
