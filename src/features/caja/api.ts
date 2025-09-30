@@ -11,11 +11,10 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  updateDoc,
   where,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { Pedido, MovimientoCaja } from '@/lib/types'
+import { Abono, Pedido, MovimientoCaja } from '@/lib/types'
 import { MovimientoCajaForm } from '@/lib/validators'
 import { abonosCollection, registrarBitacora } from '@/lib/firestore'
 import { eliminarAbonoPedido } from '@/features/cobranza/api'
@@ -68,23 +67,77 @@ export async function crearMovimientoCaja(values: MovimientoCajaForm, usuarioId:
 }
 
 export async function actualizarMovimientoCaja(id: string, values: MovimientoCajaForm, usuarioId: string) {
-  const docRef = doc(movimientosRef, id)
-  const payload = {
-    fecha: Timestamp.fromDate(values.fecha),
-    tipo: values.tipo,
-    categoria: values.categoria,
-    monto: values.monto,
-    referencia_pedido_id: values.referencia_pedido_id ? doc(db, 'pedidos', values.referencia_pedido_id) : null,
-    notas: values.notas ?? '',
-    actualizado_en: serverTimestamp(),
-  }
-  await updateDoc(docRef, payload)
+  const movimientoRef = doc(movimientosRef, id)
+  const fechaTimestamp = Timestamp.fromDate(values.fecha)
+  let referenciaPedidoRef = values.referencia_pedido_id ? doc(db, 'pedidos', values.referencia_pedido_id) : null
+
+  await runTransaction(db, async (transaction) => {
+    const movimientoSnap = await transaction.get(movimientoRef)
+    if (!movimientoSnap.exists()) {
+      throw new Error('Movimiento no encontrado')
+    }
+
+    const movimientoData = movimientoSnap.data() as Omit<MovimientoCaja, 'id'>
+    let referenciaPedidoParaActualizar = referenciaPedidoRef
+
+    if (movimientoData.referencia_abono_id) {
+      const abonoRef = movimientoData.referencia_abono_id
+      const abonoSnap = await transaction.get(abonoRef)
+      if (abonoSnap.exists()) {
+        const abonoData = abonoSnap.data() as Omit<Abono, 'id'>
+        const pedidoRef = abonoData.pedido_id
+        const pedidoSnap = await transaction.get(pedidoRef)
+
+        if (pedidoSnap.exists()) {
+          const pedidoData = pedidoSnap.data() as Omit<Pedido, 'id'>
+          const saldoMaximo = Math.max(pedidoData.total - pedidoData.anticipo, 0)
+          const nuevoSaldo = Math.min(
+            saldoMaximo,
+            Math.max(pedidoData.saldo + abonoData.monto - values.monto, 0),
+          )
+
+          transaction.update(pedidoRef, {
+            saldo: nuevoSaldo,
+            actualizado_en: serverTimestamp(),
+          })
+        }
+
+        transaction.update(abonoRef, {
+          fecha: fechaTimestamp,
+          monto: values.monto,
+        })
+
+        referenciaPedidoParaActualizar = pedidoRef
+      }
+    }
+
+    transaction.update(movimientoRef, {
+      fecha: fechaTimestamp,
+      tipo: values.tipo,
+      categoria: values.categoria,
+      monto: values.monto,
+      referencia_pedido_id: referenciaPedidoParaActualizar,
+      notas: values.notas ?? '',
+      actualizado_en: serverTimestamp(),
+    })
+
+    referenciaPedidoRef = referenciaPedidoParaActualizar
+  })
+
   await registrarBitacora({
     entidad: 'movimientos_caja',
     entidad_id: id,
     accion: 'ACTUALIZAR',
     usuario: usuarioId,
-    datos: payload,
+    datos: {
+      fecha: fechaTimestamp,
+      tipo: values.tipo,
+      categoria: values.categoria,
+      monto: values.monto,
+      referencia_pedido_id: referenciaPedidoRef,
+      notas: values.notas ?? '',
+      actualizado_en: serverTimestamp(),
+    },
   })
 }
 
