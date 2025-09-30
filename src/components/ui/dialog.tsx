@@ -50,7 +50,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogPrimitive.DialogCo
         {...props}
       >
         <span className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-300 sm:hidden" aria-hidden="true" />
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
           {children}
         </div>
         <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-sm ring-offset-white transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
