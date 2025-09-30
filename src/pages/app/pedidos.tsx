@@ -1140,37 +1140,18 @@ function DetallePedido({
       return
     }
     setBusyAction('whatsapp')
-    const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean }
     try {
       const { blob, fileName } = await buildPdfAssets()
       const message = buildWhatsappMessage()
-      let via: 'web-share' | 'link' = 'link'
-      const canUseFile = typeof File !== 'undefined'
-      const file = canUseFile ? new File([blob], fileName, { type: 'application/pdf' }) : null
-      if (file && nav.share) {
-        const shareData: ShareData = {
-          files: [file],
-          text: message,
-          title: `Pedido ${pedido.folio}`,
-        }
-        const canShareFiles = typeof nav.canShare === 'function' ? nav.canShare(shareData) : true
-        if (canShareFiles) {
-          try {
-            await nav.share(shareData)
-            via = 'web-share'
-          } catch (error) {
-            console.error('No se pudo compartir vía Web Share', error)
-          }
-        }
-      }
+      downloadBlob(blob, fileName)
+      const waUrl = `https://wa.me/52${telefonoDigits}?text=${encodeURIComponent(message)}`
+      window.open(waUrl, '_blank', 'noopener,noreferrer')
 
-      if (via === 'link') {
-        downloadBlob(blob, fileName)
-        const waUrl = `https://wa.me/52${telefonoDigits}?text=${encodeURIComponent(message)}`
-        window.open(waUrl, '_blank', 'noopener,noreferrer')
-      }
-
-      await logEvento('WHATSAPP_RESUMEN_PEDIDO', { folio: pedido.folio, via, telefono: telefonoDigits })
+      await logEvento('WHATSAPP_RESUMEN_PEDIDO', {
+        folio: pedido.folio,
+        via: 'link',
+        telefono: telefonoDigits,
+      })
     } catch (error) {
       console.error(error)
       alert('No se pudo preparar el mensaje de WhatsApp. Intenta nuevamente más tarde.')
