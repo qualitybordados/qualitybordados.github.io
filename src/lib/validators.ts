@@ -19,14 +19,8 @@ export const clienteSchema = z.object({
 
 export const pedidoItemSchema = z.object({
   descripcion_item: z.string().min(3),
-  prenda: z.string().min(1),
-  talla: z.string().min(1),
-  color_prenda: z.string().min(1),
-  ubicacion: z.string().min(1),
-  puntadas_estimadas: z.coerce.number().min(0),
-  cantidad: z.coerce.number().min(1),
   precio_unitario: z.coerce.number().min(0).multipleOf(0.01),
-  observaciones: z.string().optional().default(''),
+  importe: z.coerce.number().min(0).multipleOf(0.01),
 })
 
 export const pedidoFinanzasSchema = z.object({
