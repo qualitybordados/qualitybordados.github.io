@@ -12,7 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { usePedidos, useCreatePedido, useActualizarEstadoPedido, useUpdatePedido, useEliminarPedido } from '@/features/pedidos/hooks'
+import {
+  usePedidos,
+  useCreatePedido,
+  useActualizarEstadoPedido,
+  useUpdatePedido,
+  useEliminarPedido,
+  usePedidoItems,
+} from '@/features/pedidos/hooks'
 import { useClientes } from '@/features/clientes/hooks'
 import { useConfiguracion } from '@/features/configuracion/hooks'
 import { useAuth } from '@/hooks/use-auth'
@@ -20,13 +27,12 @@ import { formatCurrency, formatDate } from '@/lib/format'
 import { Cliente, Pedido, PedidoEstado, Prioridad } from '@/lib/types'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
-import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight, Pencil, Trash } from 'lucide-react'
+import { Loader2, Plus, Calendar, User, DollarSign, ChevronRight, ChevronLeft, Pencil, Trash } from 'lucide-react'
 import dayjs from 'dayjs'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { PedidoForm, PedidoItemForm } from '@/lib/validators'
 import { clsx } from 'clsx'
-import { PedidoQuickActionsDialog } from '@/features/pedidos/components/pedido-quick-actions-dialog'
 
 const estadosPedido: PedidoEstado[] = [
   'COTIZACIÓN',
@@ -77,7 +83,36 @@ export default function PedidosPage() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null)
   const [pedidoEdicion, setPedidoEdicion] = useState<Pedido | null>(null)
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
+  const [wizardKey, setWizardKey] = useState(0)
+  const {
+    data: pedidoItemsEdicion,
+    isLoading: pedidoItemsLoading,
+  } = usePedidoItems(pedidoEdicion?.id, { enabled: wizardOpen && !!pedidoEdicion })
+
+  const pedidoInicial = useMemo(() => {
+    if (!pedidoEdicion || !pedidoItemsEdicion) return null
+    return {
+      folio: pedidoEdicion.folio,
+      cliente_id: pedidoEdicion.cliente_id.id,
+      fecha_pedido: pedidoEdicion.fecha_pedido.toDate(),
+      fecha_compromiso: pedidoEdicion.fecha_compromiso.toDate(),
+      status: pedidoEdicion.status,
+      prioridad: pedidoEdicion.prioridad,
+      notas: pedidoEdicion.notas ?? '',
+      anticipo: pedidoEdicion.anticipo,
+      subtotal: pedidoEdicion.subtotal,
+      descuento: pedidoEdicion.descuento,
+      impuestos: pedidoEdicion.impuestos,
+      total: pedidoEdicion.total,
+      saldo: pedidoEdicion.saldo,
+      items: pedidoItemsEdicion.map((item) => ({
+        descripcion_item: item.descripcion_item,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        importe: item.importe,
+      })),
+    } satisfies PedidoForm
+  }, [pedidoEdicion, pedidoItemsEdicion])
 
   const puedeCrear = ['OWNER', 'ADMIN', 'VENTAS'].includes(role ?? '')
   const puedeActualizarEstado = ['OWNER', 'ADMIN', 'PRODUCCION'].includes(role ?? '')
@@ -89,8 +124,9 @@ export default function PedidosPage() {
   }
 
   function abrirEdicion(pedido: Pedido) {
+    setDetallePedido(null)
     setPedidoEdicion(pedido)
-    setQuickActionsOpen(true)
+    setWizardOpen(true)
   }
 
   async function handleEliminarPedido(pedido: Pedido) {
@@ -115,7 +151,15 @@ export default function PedidosPage() {
             {pedidos?.length ? `${pedidos.length} pedidos en seguimiento` : 'Sin pedidos registrados aún'}
           </div>
           {puedeCrear ? (
-            <Button onClick={() => { setDetallePedido(null); setWizardOpen(true) }} className="hidden sm:inline-flex">
+            <Button
+              onClick={() => {
+                setDetallePedido(null)
+                setPedidoEdicion(null)
+                setWizardKey((prev) => prev + 1)
+                setWizardOpen(true)
+              }}
+              className="hidden sm:inline-flex"
+            >
               <Plus className="h-4 w-4" />
               <span>Nuevo pedido</span>
             </Button>
@@ -138,6 +182,7 @@ export default function PedidosPage() {
           pedidos.map((pedido) => {
             const estadoIndex = estadosPedido.indexOf(pedido.status)
             const siguienteEstado = estadosPedido[estadoIndex + 1]
+            const anteriorEstado = estadosPedido[estadoIndex - 1]
             const clienteNombre = clientesMap.get(pedido.cliente_id.id) ?? pedido.cliente_id.id
             return (
               <PedidoCard
@@ -146,6 +191,8 @@ export default function PedidosPage() {
                 onClick={() => setDetallePedido(pedido)}
                 onAvanzar={siguienteEstado ? () => handleCambioEstado(pedido.id, siguienteEstado) : undefined}
                 puedeAvanzar={!!siguienteEstado && puedeActualizarEstado}
+                onRetroceder={anteriorEstado ? () => handleCambioEstado(pedido.id, anteriorEstado) : undefined}
+                puedeRetroceder={!!anteriorEstado && puedeActualizarEstado}
                 avanzando={actualizarEstado.isPending}
                 onEdit={() => abrirEdicion(pedido)}
                 onDelete={() => handleEliminarPedido(pedido)}
@@ -166,26 +213,66 @@ export default function PedidosPage() {
         <Button
           size="fab"
           className="fixed bottom-24 right-6 z-40 sm:hidden"
-          onClick={() => { setDetallePedido(null); setWizardOpen(true) }}
+          onClick={() => {
+            setDetallePedido(null)
+            setPedidoEdicion(null)
+            setWizardKey((prev) => prev + 1)
+            setWizardOpen(true)
+          }}
           aria-label="Nuevo pedido"
         >
           <Plus className="h-6 w-6" />
         </Button>
       ) : null}
 
-      <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+      <Dialog
+        open={wizardOpen}
+        onOpenChange={(open) => {
+          setWizardOpen(open)
+          if (!open) {
+            setPedidoEdicion(null)
+          }
+        }}
+      >
         <DialogContent>
           {clientesData && config ? (
-            <PedidoWizard
-              clientes={clientesData}
-              anticipoMinimo={config.porcentaje_anticipo}
-              onSubmit={async (values) => {
-                if (!user) return
-                await createPedido.mutateAsync({ data: values, usuarioId: user.uid })
-                setWizardOpen(false)
-              }}
-              onClose={() => setWizardOpen(false)}
-            />
+            pedidoEdicion ? (
+              pedidoItemsLoading || !pedidoInicial ? (
+                <DialogBody className="flex h-48 items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+                </DialogBody>
+              ) : (
+                <PedidoWizard
+                  key={pedidoEdicion.id}
+                  mode="edit"
+                  clientes={clientesData}
+                  anticipoMinimo={config.porcentaje_anticipo}
+                  initialData={pedidoInicial}
+                  onSubmit={async (values) => {
+                    if (!user || !pedidoEdicion) return
+                    await updatePedido.mutateAsync({ id: pedidoEdicion.id, data: values, usuarioId: user.uid })
+                    setWizardOpen(false)
+                    setPedidoEdicion(null)
+                  }}
+                  onClose={() => setWizardOpen(false)}
+                  isSubmitting={updatePedido.isPending}
+                />
+              )
+            ) : (
+              <PedidoWizard
+                key={wizardKey}
+                mode="create"
+                clientes={clientesData}
+                anticipoMinimo={config.porcentaje_anticipo}
+                onSubmit={async (values) => {
+                  if (!user) return
+                  await createPedido.mutateAsync({ data: values, usuarioId: user.uid })
+                  setWizardOpen(false)
+                }}
+                onClose={() => setWizardOpen(false)}
+                isSubmitting={createPedido.isPending}
+              />
+            )
           ) : (
             <DialogBody className="flex h-48 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
@@ -199,36 +286,6 @@ export default function PedidosPage() {
           {detallePedido ? <DetallePedido pedido={detallePedido} onClose={() => setDetallePedido(null)} /> : null}
         </DialogContent>
       </Dialog>
-
-      <PedidoQuickActionsDialog
-        open={quickActionsOpen && !!pedidoEdicion}
-        pedido={pedidoEdicion}
-        onOpenChange={(open) => {
-          setQuickActionsOpen(open)
-          if (!open) {
-            setPedidoEdicion(null)
-          }
-        }}
-        onSubmit={async (values) => {
-          if (!user || !pedidoEdicion) return
-          await updatePedido.mutateAsync({ id: pedidoEdicion.id, data: values, usuarioId: user.uid })
-          setQuickActionsOpen(false)
-          setPedidoEdicion(null)
-        }}
-        onDelete={
-          puedeEditar
-            ? async () => {
-                if (!pedidoEdicion) return
-                await handleEliminarPedido(pedidoEdicion)
-                setQuickActionsOpen(false)
-                setPedidoEdicion(null)
-              }
-            : undefined
-        }
-        isSubmitting={updatePedido.isPending}
-        isDeleting={eliminarPedido.isPending}
-        allowDelete={puedeEditar}
-      />
     </div>
   )
 }
@@ -237,7 +294,9 @@ function PedidoCard({
   pedido,
   onClick,
   onAvanzar,
+  onRetroceder,
   puedeAvanzar,
+  puedeRetroceder,
   avanzando,
   onEdit,
   onDelete,
@@ -247,7 +306,9 @@ function PedidoCard({
   pedido: Pedido
   onClick: () => void
   onAvanzar?: () => void
+  onRetroceder?: () => void
   puedeAvanzar: boolean
+  puedeRetroceder: boolean
   avanzando: boolean
   onEdit: () => void
   onDelete: () => void
@@ -327,20 +388,39 @@ function PedidoCard({
           <DollarSign className="h-4 w-4 text-slate-400" />
           {formatCurrency(pedido.saldo)}
         </div>
-        {puedeAvanzar && onAvanzar ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 border border-slate-200"
-            onClick={(event) => {
-              event.stopPropagation()
-              onAvanzar()
-            }}
-            disabled={avanzando}
-            aria-label="Avanzar estado"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        {((puedeRetroceder && onRetroceder) || (puedeAvanzar && onAvanzar)) ? (
+          <div className="flex items-center gap-2">
+            {puedeRetroceder && onRetroceder ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRetroceder()
+                }}
+                disabled={avanzando}
+                aria-label="Retroceder estado"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            ) : null}
+            {puedeAvanzar && onAvanzar ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onAvanzar()
+                }}
+                disabled={avanzando}
+                aria-label="Avanzar estado"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </Card>
@@ -352,33 +432,49 @@ function PedidoWizard({
   anticipoMinimo,
   onSubmit,
   onClose,
+  initialData,
+  mode = 'create',
+  isSubmitting = false,
 }: {
   clientes: Cliente[]
   anticipoMinimo: number
   onSubmit: (values: PedidoForm) => Promise<void>
   onClose: () => void
+  initialData?: PedidoForm
+  mode?: 'create' | 'edit'
+  isSubmitting?: boolean
 }) {
   const [step, setStep] = useState(1)
   const today = dayjs().startOf('day')
-  const [items, setItems] = useState<PedidoItemForm[]>([])
-  const [descuentoActivo, setDescuentoActivo] = useState(false)
-  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0)
-  const [impuestosActivos, setImpuestosActivos] = useState(true)
-  const [formState, setFormState] = useState<Omit<PedidoForm, 'items'>>({
-    folio: `QB-${dayjs().format('YYYYMMDD-HHmm')}`,
-    cliente_id: clientes[0]?.id ?? '',
-    fecha_pedido: today.toDate(),
-    fecha_compromiso: today.add(7, 'day').toDate(),
-    status: 'COTIZACIÓN',
-    prioridad: 'MEDIA',
-    notas: '',
-    anticipo: 0,
-    subtotal: 0,
-    descuento: 0,
-    impuestos: 0,
-    total: 0,
-    saldo: 0,
+  const [formState, setFormState] = useState<Omit<PedidoForm, 'items'>>(() => ({
+    folio: initialData?.folio ?? `QB-${dayjs().format('YYYYMMDD-HHmm')}`,
+    cliente_id: initialData?.cliente_id ?? clientes[0]?.id ?? '',
+    fecha_pedido: initialData?.fecha_pedido ?? today.toDate(),
+    fecha_compromiso: initialData?.fecha_compromiso ?? today.add(7, 'day').toDate(),
+    status: initialData?.status ?? 'COTIZACIÓN',
+    prioridad: initialData?.prioridad ?? 'MEDIA',
+    notas: initialData?.notas ?? '',
+    anticipo: initialData?.anticipo ?? 0,
+    subtotal: initialData?.subtotal ?? 0,
+    descuento: initialData?.descuento ?? 0,
+    impuestos: initialData?.impuestos ?? 0,
+    total: initialData?.total ?? 0,
+    saldo: initialData?.saldo ?? 0,
+  }))
+  const [items, setItems] = useState<PedidoItemForm[]>(() =>
+    (initialData?.items ?? []).map((item) => ({
+      descripcion_item: item.descripcion_item,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario,
+      importe: Number((item.cantidad * item.precio_unitario).toFixed(2)),
+    })),
+  )
+  const [descuentoActivo, setDescuentoActivo] = useState(() => (initialData ? initialData.descuento > 0 : false))
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => {
+    if (!initialData || initialData.subtotal === 0) return 0
+    return Number(((initialData.descuento / initialData.subtotal) * 100).toFixed(2))
   })
+  const [impuestosActivos, setImpuestosActivos] = useState(() => (initialData ? initialData.impuestos > 0 : true))
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.importe, 0), [items])
   const descuento = useMemo(() => {
@@ -408,7 +504,19 @@ function PedidoWizard({
         }
         if (field === 'precio_unitario') {
           const precio = Number(value) || 0
-          return { ...item, precio_unitario: precio, importe: Number(precio.toFixed(2)) }
+          return {
+            ...item,
+            precio_unitario: precio,
+            importe: Number((item.cantidad * precio).toFixed(2)),
+          }
+        }
+        if (field === 'cantidad') {
+          const cantidad = Math.max(1, Math.floor(Number(value) || 0))
+          return {
+            ...item,
+            cantidad,
+            importe: Number((cantidad * item.precio_unitario).toFixed(2)),
+          }
         }
         if (field === 'importe') {
           const importeActual = Number(value) || 0
@@ -424,6 +532,7 @@ function PedidoWizard({
       ...prev,
       {
         descripcion_item: '',
+        cantidad: 1,
         precio_unitario: 0,
         importe: 0,
       },
@@ -431,6 +540,9 @@ function PedidoWizard({
   }
 
   async function handleSubmit() {
+    if (isSubmitting) {
+      return
+    }
     if (!items.length) {
       alert('Agrega al menos un item al pedido.')
       return
@@ -445,6 +557,12 @@ function PedidoWizard({
         return
       }
     }
+    const normalizados = items.map((item) => ({
+      descripcion_item: item.descripcion_item,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario,
+      importe: Number((item.cantidad * item.precio_unitario).toFixed(2)),
+    }))
     const payload: PedidoForm = {
       ...formState,
       subtotal,
@@ -452,7 +570,7 @@ function PedidoWizard({
       impuestos,
       total,
       saldo,
-      items,
+      items: normalizados,
     }
     await onSubmit(payload)
   }
@@ -470,7 +588,9 @@ function PedidoWizard({
     return (
       <>
         <DialogHeader>
-          <DialogTitle>Nuevo pedido</DialogTitle>
+          <DialogTitle>
+            {mode === 'edit' ? `Editar pedido${initialData ? ` ${initialData.folio}` : ''}` : 'Nuevo pedido'}
+          </DialogTitle>
           <DialogDescription>Completa los pasos para generar el pedido y calcular los importes finales.</DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -494,7 +614,9 @@ function PedidoWizard({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Nuevo pedido</DialogTitle>
+        <DialogTitle>
+          {mode === 'edit' ? `Editar pedido${initialData ? ` ${initialData.folio}` : ''}` : 'Nuevo pedido'}
+        </DialogTitle>
         <DialogDescription>Completa los pasos para generar el pedido y calcular los importes finales.</DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-6">
@@ -569,8 +691,18 @@ function PedidoWizard({
           <div className="space-y-4">
             {items.map((item, index) => (
               <div key={index} className="rounded-2xl border border-slate-200 p-4">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-4">
                   <label className="flex flex-col gap-1 text-sm">
+                    Cantidad
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={item.cantidad}
+                      onChange={(event) => updateItem(index, 'cantidad', Number(event.target.value))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
                     Descripción
                     <Input
                       value={item.descripcion_item}
@@ -586,9 +718,10 @@ function PedidoWizard({
                       onChange={(event) => updateItem(index, 'precio_unitario', Number(event.target.value))}
                     />
                   </label>
-                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                    Importe total
+                  <label className="flex flex-col gap-1 text-sm md:col-span-1">
+                    Subtotal
                     <Input type="number" readOnly value={item.importe.toFixed(2)} />
+                    <span className="text-xs text-slate-500">Se calcula automáticamente.</span>
                   </label>
                 </div>
               </div>
@@ -691,7 +824,9 @@ function PedidoWizard({
               <ul className="mt-2 space-y-2 text-xs text-slate-600">
                 {items.map((item, index) => (
                   <li key={index} className="flex items-center justify-between">
-                    <span>{item.descripcion_item}</span>
+                    <span>
+                      {item.cantidad} × {item.descripcion_item}
+                    </span>
                     <span>{formatCurrency(item.importe)}</span>
                   </li>
                 ))}
@@ -711,7 +846,7 @@ function PedidoWizard({
       <DialogFooter className="gap-3 sm:justify-between">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <DialogClose asChild>
-            <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onClose}>
+            <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onClose} disabled={isSubmitting}>
               Cancelar
             </Button>
           </DialogClose>
@@ -720,7 +855,7 @@ function PedidoWizard({
             variant="outline"
             className="w-full sm:w-auto"
             onClick={() => setStep((prev) => Math.max(1, prev - 1))}
-            disabled={step === 1}
+            disabled={step === 1 || isSubmitting}
           >
             Regresar
           </Button>
@@ -729,9 +864,15 @@ function PedidoWizard({
           type="button"
           className="w-full sm:w-auto"
           onClick={isLastStep ? handleSubmit : () => setStep((prev) => prev + 1)}
-          disabled={!isLastStep && step === 2 && items.length === 0}
+          disabled={(step === 2 && items.length === 0) || isSubmitting}
         >
-          {isLastStep ? 'Crear pedido' : 'Continuar'}
+          {isLastStep
+            ? isSubmitting
+              ? 'Guardando...'
+              : mode === 'edit'
+                ? 'Guardar cambios'
+                : 'Crear pedido'
+            : 'Continuar'}
         </Button>
       </DialogFooter>
     </>

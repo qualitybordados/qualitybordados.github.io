@@ -56,6 +56,7 @@ export interface Pedido {
 export interface PedidoItem {
   id: string
   descripcion_item: string
+  cantidad: number
   precio_unitario: number
   importe: number
 }
