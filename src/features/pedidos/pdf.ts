@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import dayjs from 'dayjs'
 import { Abono, Cliente, Pedido, PedidoItem } from '@/lib/types'
 
@@ -31,7 +31,7 @@ function wrapText({
   maxWidth,
 }: {
   text: string
-  font: any
+  font: PDFFont
   size: number
   maxWidth: number
 }) {
