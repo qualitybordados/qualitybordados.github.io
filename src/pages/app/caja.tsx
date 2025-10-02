@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useMovimientosCaja, useCrearMovimientoCaja, useActualizarMovimientoCaja, useEliminarMovimientoCaja } from '@/features/caja/hooks'
 import { useAuth } from '@/hooks/use-auth'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { MovimientoCaja } from '@/lib/types'
+import type { MovimientoCajaConDetalles } from '@/features/caja/api'
 import {
   Dialog,
   DialogBody,
@@ -17,7 +17,20 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Download, Plus, ArrowDownCircle, ArrowUpCircle, Pencil, Trash } from 'lucide-react'
+import {
+  Download,
+  Plus,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Pencil,
+  Trash,
+  Search,
+  X,
+  User,
+  Package,
+  FileText,
+  Tag,
+} from 'lucide-react'
 import dayjs from 'dayjs'
 import { EmptyState } from '@/components/common/empty-state'
 import { MovimientoCajaForm } from '@/lib/validators'
@@ -27,9 +40,10 @@ import { Badge } from '@/components/ui/badge'
 export default function CajaPage() {
   const { user, role, loading } = useAuth()
   const [tipoFiltro, setTipoFiltro] = useState<'INGRESO' | 'EGRESO' | 'TODOS'>('TODOS')
-  const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [fechaInicio, setFechaInicio] = useState(dayjs().subtract(7, 'day').format('YYYY-MM-DD'))
   const [fechaFin, setFechaFin] = useState(dayjs().format('YYYY-MM-DD'))
+  const [busquedaTerminos, setBusquedaTerminos] = useState<string[]>([])
+  const [busquedaActual, setBusquedaActual] = useState('')
 
   const authReady = !!user && !loading
 
@@ -40,7 +54,6 @@ export default function CajaPage() {
   } = useMovimientosCaja(
     {
       tipo: tipoFiltro,
-      categoria: categoriaFiltro || undefined,
       desde: dayjs(fechaInicio).toDate(),
       hasta: dayjs(fechaFin).toDate(),
     },
@@ -54,27 +67,87 @@ export default function CajaPage() {
   const eliminarMovimiento = useEliminarMovimientoCaja()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'crear' | 'editar'>('crear')
-  const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<MovimientoCaja | null>(null)
+  const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<MovimientoCajaConDetalles | null>(null)
+
+  const movimientosConBusqueda = useMemo(() => movimientos ?? [], [movimientos])
+
+  const movimientosFiltrados = useMemo(() => {
+    if (!busquedaTerminos.length) {
+      return movimientosConBusqueda
+    }
+
+    const terminosNormalizados = busquedaTerminos.map((termino) => termino.trim().toLowerCase()).filter(Boolean)
+    if (!terminosNormalizados.length) {
+      return movimientosConBusqueda
+    }
+
+    return movimientosConBusqueda.filter((movimiento) => {
+      const posiblesValores = [
+        movimiento.pedido?.folio ?? '',
+        movimiento.referenciaPedidoId ?? '',
+        movimiento.cliente?.alias ?? '',
+        movimiento.cliente?.nombre_legal ?? '',
+        movimiento.notas ?? '',
+        movimiento.categoria ?? '',
+      ].map((valor) => valor.toLowerCase())
+
+      return terminosNormalizados.every((termino) =>
+        posiblesValores.some((valor) => valor.includes(termino)),
+      )
+    })
+  }, [busquedaTerminos, movimientosConBusqueda])
 
   const totales = useMemo(() => {
-    if (!movimientos) return { ingreso: 0, egreso: 0, neto: 0 }
-    const ingreso = movimientos.filter((m) => m.tipo === 'INGRESO').reduce((sum, mov) => sum + mov.monto, 0)
-    const egreso = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, mov) => sum + mov.monto, 0)
+    const lista = busquedaTerminos.length ? movimientosFiltrados : movimientosConBusqueda
+    if (!lista.length) return { ingreso: 0, egreso: 0, neto: 0 }
+    const ingreso = lista.filter((m) => m.tipo === 'INGRESO').reduce((sum, mov) => sum + mov.monto, 0)
+    const egreso = lista.filter((m) => m.tipo === 'EGRESO').reduce((sum, mov) => sum + mov.monto, 0)
     return { ingreso, egreso, neto: ingreso - egreso }
-  }, [movimientos])
+  }, [busquedaTerminos.length, movimientosFiltrados, movimientosConBusqueda])
+
+  function agregarTerminosDesdeCadena(cadena: string) {
+    const nuevosTerminos = cadena
+      .split(/[,\n]/)
+      .map((termino) => termino.trim())
+      .filter((termino) => termino.length > 0)
+
+    if (!nuevosTerminos.length) return
+
+    setBusquedaTerminos((prev) => {
+      const existente = new Set(prev.map((termino) => termino.toLowerCase()))
+      const actualizados = [...prev]
+      nuevosTerminos.forEach((termino) => {
+        if (!existente.has(termino.toLowerCase())) {
+          actualizados.push(termino)
+        }
+      })
+      return actualizados
+    })
+  }
+
+  function agregarBusquedaActual() {
+    if (!busquedaActual.trim()) return
+    agregarTerminosDesdeCadena(busquedaActual)
+    setBusquedaActual('')
+  }
+
+  function eliminarBusqueda(termino: string) {
+    setBusquedaTerminos((prev) => prev.filter((item) => item.toLowerCase() !== termino.toLowerCase()))
+  }
 
   function exportarCSV() {
-    if (!movimientos || !movimientos.length) return
-    const encabezados = 'Fecha,Tipo,Categoría,Monto,Referencia,Notas\n'
-    const filas = movimientos
+    if (!movimientosConBusqueda.length) return
+    const encabezados = 'Fecha,Tipo,Categoría,Monto,Folio Pedido,Cliente,Notas\n'
+    const filas = movimientosConBusqueda
       .map((mov) => {
         const fecha = formatDate(mov.fecha.toDate())
         const tipo = mov.tipo
         const categoria = mov.categoria
         const monto = mov.monto.toFixed(2)
-        const referencia = mov.referencia_pedido_id ? mov.referencia_pedido_id.id : ''
+        const folio = mov.pedido?.folio ?? mov.referenciaPedidoId ?? ''
+        const cliente = mov.cliente?.alias ?? ''
         const notas = mov.notas?.replace(/,/g, ';') ?? ''
-        return `${fecha},${tipo},${categoria},${monto},${referencia},${notas}`
+        return `${fecha},${tipo},${categoria},${monto},${folio},${cliente},${notas}`
       })
       .join('\n')
     const blob = new Blob([encabezados + filas], { type: 'text/csv;charset=utf-8;' })
@@ -94,13 +167,13 @@ export default function CajaPage() {
     setDialogOpen(true)
   }
 
-  function abrirEdicionMovimiento(movimiento: MovimientoCaja) {
+  function abrirEdicionMovimiento(movimiento: MovimientoCajaConDetalles) {
     setDialogMode('editar')
     setMovimientoSeleccionado(movimiento)
     setDialogOpen(true)
   }
 
-  async function handleEliminarMovimiento(movimiento: MovimientoCaja) {
+  async function handleEliminarMovimiento(movimiento: MovimientoCajaConDetalles) {
     if (!user) return
     if (confirm(`¿Eliminar el ${movimiento.tipo.toLowerCase()} por ${formatCurrency(movimiento.monto)}?`)) {
       await eliminarMovimiento.mutateAsync({
@@ -132,10 +205,53 @@ export default function CajaPage() {
                 <option value="EGRESO">Egresos</option>
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
-              Categoría
-              <Input value={categoriaFiltro} onChange={(event) => setCategoriaFiltro(event.target.value)} />
-            </label>
+            <div className="flex flex-col gap-1 text-xs uppercase text-slate-500 sm:col-span-2">
+              Buscar
+              <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus-within:ring-2 focus-within:ring-accent">
+                <Search className="h-4 w-4 text-slate-400" />
+                {busquedaTerminos.map((termino) => (
+                  <span
+                    key={termino}
+                    className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+                  >
+                    {termino}
+                    <button
+                      type="button"
+                      className="text-slate-400 transition-colors hover:text-slate-600"
+                      onClick={() => eliminarBusqueda(termino)}
+                      aria-label={`Quitar filtro ${termino}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className="flex-1 border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                  value={busquedaActual}
+                  onChange={(event) => setBusquedaActual(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ',') {
+                      event.preventDefault()
+                      agregarBusquedaActual()
+                    } else if (event.key === 'Backspace' && !busquedaActual && busquedaTerminos.length) {
+                      event.preventDefault()
+                      eliminarBusqueda(busquedaTerminos[busquedaTerminos.length - 1])
+                    }
+                  }}
+                  onBlur={() => agregarBusquedaActual()}
+                  onPaste={(event) => {
+                    event.preventDefault()
+                    const text = event.clipboardData.getData('text')
+                    agregarTerminosDesdeCadena(text)
+                    setBusquedaActual('')
+                  }}
+                  placeholder="Cliente o folio"
+                />
+              </div>
+              <span className="text-[10px] normal-case text-slate-400">
+                Escribe un cliente o folio y presiona Enter para agregar múltiples filtros.
+              </span>
+            </div>
             <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
               Desde
               <Input type="date" value={fechaInicio} onChange={(event) => setFechaInicio(event.target.value)} />
@@ -146,7 +262,7 @@ export default function CajaPage() {
             </label>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" onClick={exportarCSV} disabled={!movimientos?.length} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={exportarCSV} disabled={!movimientosConBusqueda.length} className="w-full sm:w-auto">
               <Download className="h-4 w-4" />
               Exportar CSV
             </Button>
@@ -178,8 +294,8 @@ export default function CajaPage() {
               </div>
             </Card>
           ))
-        ) : movimientos && movimientos.length ? (
-          movimientos.map((movimiento) => (
+        ) : movimientosFiltrados.length ? (
+          movimientosFiltrados.map((movimiento) => (
             <MovimientoCard
               key={movimiento.id}
               movimiento={movimiento}
@@ -188,6 +304,11 @@ export default function CajaPage() {
               allowActions={puedeCrear}
             />
           ))
+        ) : busquedaTerminos.length ? (
+          <EmptyState
+            title="Sin resultados"
+            description="No encontramos movimientos que coincidan con tu búsqueda. Ajusta los filtros para intentarlo nuevamente."
+          />
         ) : (
           <EmptyState title="Sin movimientos" description="Registra un ingreso o egreso para comenzar." />
         )}
@@ -309,56 +430,93 @@ function MovimientoCard({
   onDelete,
   allowActions,
 }: {
-  movimiento: MovimientoCaja
+  movimiento: MovimientoCajaConDetalles
   onEdit: () => void
   onDelete: () => void
   allowActions: boolean
 }) {
   const esIngreso = movimiento.tipo === 'INGRESO'
   const tipoBadge = esIngreso ? 'success' : 'warning'
+  const categoriaLabel = movimiento.categoria || 'Sin categoría'
+  const folioPedido = movimiento.pedido?.folio ?? movimiento.referenciaPedidoId ?? null
+  const estadoPedido = movimiento.pedido?.status
+  const clienteNombre = movimiento.cliente?.alias ?? movimiento.cliente?.nombre_legal ?? null
+  const notasMovimiento = movimiento.notas?.trim() ?? ''
 
   return (
     <Card className="border-none bg-white/90 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <Badge variant={tipoBadge} className="uppercase">
-            {movimiento.tipo}
-          </Badge>
-          <span className="text-2xl font-semibold text-slate-900">{formatCurrency(movimiento.monto)}</span>
-          <span className="text-xs uppercase tracking-wide text-slate-400">{movimiento.categoria || 'Sin categoría'}</span>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={tipoBadge} className="uppercase">
+                {movimiento.tipo}
+              </Badge>
+              <Badge variant="outline" className="bg-slate-100 text-slate-600">
+                {categoriaLabel}
+              </Badge>
+              {folioPedido ? (
+                <Badge variant="outline" className="bg-sky-100 text-sky-700">
+                  Pedido {folioPedido}
+                </Badge>
+              ) : null}
+            </div>
+            <span className="text-2xl font-semibold text-slate-900">{formatCurrency(movimiento.monto)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">{formatDate(movimiento.fecha.toDate())}</span>
+            {allowActions ? (
+              <>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 border border-slate-200"
+                  onClick={onEdit}
+                  aria-label="Editar movimiento"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 border border-slate-200 text-destructive"
+                  onClick={onDelete}
+                  aria-label="Eliminar movimiento"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </>
+            ) : null}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">{formatDate(movimiento.fecha.toDate())}</span>
-          {allowActions ? (
-            <>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 border border-slate-200"
-                onClick={onEdit}
-                aria-label="Editar movimiento"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 border border-slate-200 text-destructive"
-                onClick={onDelete}
-                aria-label="Eliminar movimiento"
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
-            </>
+
+        <div className="space-y-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-slate-500">
+            <Tag className="h-4 w-4 text-slate-400" />
+            <span>{categoriaLabel}</span>
+          </div>
+          {folioPedido ? (
+            <div className="flex flex-wrap items-center gap-2 text-slate-500">
+              <Package className="h-4 w-4 text-slate-400" />
+              <span className="font-medium text-slate-700">Pedido {folioPedido}</span>
+              {estadoPedido ? (
+                <Badge variant="outline" className="bg-slate-100 text-xs uppercase text-slate-500">
+                  {estadoPedido}
+                </Badge>
+              ) : null}
+            </div>
           ) : null}
+          {clienteNombre ? (
+            <div className="flex items-center gap-2 text-slate-500">
+              <User className="h-4 w-4 text-slate-400" />
+              <span className="font-medium text-slate-700">{clienteNombre}</span>
+            </div>
+          ) : null}
+          <div className="flex items-start gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+            <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
+            <span>{notasMovimiento || 'Sin notas adicionales.'}</span>
+          </div>
         </div>
-      </div>
-      <div className="mt-3 space-y-2 text-sm text-slate-600">
-        <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-700">Referencia</span>
-          <span className="text-xs text-slate-500">{movimiento.referencia_pedido_id?.id ?? 'N/A'}</span>
-        </div>
-        <p className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">{movimiento.notas || 'Sin notas adicionales.'}</p>
       </div>
     </Card>
   )
