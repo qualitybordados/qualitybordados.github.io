@@ -9,7 +9,7 @@ Aplicación web responsiva para gestionar clientes, pedidos, cobranza y caja de 
 - **Clientes**: CRUD completo con validaciones (RFC, teléfono MX, límites de crédito), filtros, detalle con historial de pedidos y cálculo de saldo.
 - **Pedidos**: Wizard de 4 pasos (cliente → items → importes → confirmación), cálculo automático de totales/saldo, control de prioridades y máquina de estados con bitácora.
 - **Cobranza**: listado de pedidos con saldo pendiente, registro de abonos con actualización inmediata del saldo y movimiento automático en caja.
-- **Caja**: registro de ingresos/egresos, filtros por tipo/categoría/rango de fechas, totales y exportación CSV rápida.
+- **Finanzas**: registro de ingresos/egresos, filtros por tipo/categoría/rango de fechas, métricas y reporte PDF estilo CRM.
 - **Configuración**: anticipo mínimo por defecto, políticas de crédito y administración de roles visibles (solo OWNER/ADMIN).
 
 ## Tecnologías
@@ -111,7 +111,7 @@ Configura los índices compuestos en Firestore:
 
 ## Roles y permisos de la UI
 
-| Rol | Clientes | Pedidos | Producción | Cobranza | Caja | Config |
+| Rol | Clientes | Pedidos | Producción | Cobranza | Finanzas | Config |
 | --- | --- | --- | --- | --- | --- | --- |
 | OWNER / ADMIN | acceso total | total | total | total | total | total |
 | VENTAS | crear/editar | crear/editar hasta APROBADO | ver | ver | ver | ver |

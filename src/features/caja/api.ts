@@ -39,6 +39,7 @@ export type MovimientoCajaConDetalles = MovimientoCaja & {
 
 export async function fetchMovimientosCaja(params?: {
   tipo?: 'INGRESO' | 'EGRESO' | 'TODOS'
+  categoria?: string | 'TODAS'
   desde?: Date
   hasta?: Date
 }) {
@@ -59,8 +60,19 @@ export async function fetchMovimientosCaja(params?: {
     ...(docSnap.data() as Omit<MovimientoCaja, 'id'>),
   }))
 
+  const categoriaFiltro =
+    params?.categoria && params.categoria !== 'TODAS'
+      ? params.categoria.trim().toLowerCase()
+      : null
+
+  const movimientosFiltrados = categoriaFiltro
+    ? movimientos.filter((movimiento) =>
+        (movimiento.categoria ?? '').trim().toLowerCase() === categoriaFiltro,
+      )
+    : movimientos
+
   const pedidoIds = new Set<string>()
-  movimientos.forEach((movimiento) => {
+  movimientosFiltrados.forEach((movimiento) => {
     if (!movimiento.referencia_pedido_id) {
       return
     }
@@ -107,7 +119,7 @@ export async function fetchMovimientosCaja(params?: {
     }),
   )
 
-  return movimientos.map<MovimientoCajaConDetalles>((movimiento) => {
+  return movimientosFiltrados.map<MovimientoCajaConDetalles>((movimiento) => {
     let referenciaPedidoId: string | null = null
     let pedidoDetalle: MovimientoCajaConDetalles['pedido']
     let clienteDetalle: MovimientoCajaConDetalles['cliente']
