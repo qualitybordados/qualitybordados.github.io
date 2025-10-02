@@ -12,6 +12,7 @@ const CAJA_KEY = ['caja']
 
 type CajaFilters = {
   tipo?: 'INGRESO' | 'EGRESO' | 'TODOS'
+  categoria?: string | 'TODAS'
   desde?: Date
   hasta?: Date
 }

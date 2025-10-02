@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LogOut, Menu, Settings, Users, ClipboardList, DollarSign, Home, PiggyBank, X } from 'lucide-react'
+import { LogOut, Menu, Settings, Users, ClipboardList, DollarSign, Home, Coins, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 import { signOut } from 'firebase/auth'
@@ -13,7 +13,7 @@ const navigation = [
   { to: '/app/clientes', label: 'Clientes', icon: Users },
   { to: '/app/pedidos', label: 'Pedidos', icon: ClipboardList },
   { to: '/app/cobranza', label: 'Cobranza', icon: DollarSign },
-  { to: '/app/caja', label: 'Caja', icon: PiggyBank },
+  { to: '/app/caja', label: 'Finanzas', icon: Coins },
   { to: '/app/config', label: 'Configuración', icon: Settings },
 ]
 

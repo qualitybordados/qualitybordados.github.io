@@ -57,7 +57,7 @@ export default function DashboardPage() {
         />
         <KpiCard
           icon={TrendingUp}
-          title="Flujo caja 7 días"
+          title="Flujo financiero 7 días"
           highlight={formatCurrency(data.flujoCaja.reduce((acc, item) => acc + item.monto, 0))}
           helper="Ingresos menos egresos de la semana."
           tone="success"
@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
           <Card className="w-full">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Flujo de caja 7 días</CardTitle>
+              <CardTitle className="text-base font-semibold">Flujo financiero 7 días</CardTitle>
             </CardHeader>
             <CardContent className="h-72 pb-6">
               {data.flujoCaja.length ? (
@@ -111,7 +111,7 @@ export default function DashboardPage() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <EmptyState title="Sin movimientos" description="Registra ingresos o egresos en Caja." />
+                <EmptyState title="Sin movimientos" description="Registra ingresos o egresos en Finanzas." />
               )}
             </CardContent>
           </Card>
