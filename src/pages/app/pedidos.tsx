@@ -82,11 +82,40 @@ const estadoVariantMap: Record<PedidoEstado, 'success' | 'warning' | 'destructiv
 export default function PedidosPage() {
   const { user, role, loading } = useAuth()
   const authReady = !!user && !loading
+  const [estatusFiltro, setEstatusFiltro] = useState<PedidoEstado | 'TODOS'>('TODOS')
+  const [folioFiltro, setFolioFiltro] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const filtrosPedidos = useMemo(() => {
+    const filtros: {
+      status: PedidoEstado | 'TODOS'
+      folio?: string
+      desde?: Date
+      hasta?: Date
+    } = {
+      status: estatusFiltro,
+    }
+
+    const folioLimpio = folioFiltro.trim()
+    if (folioLimpio) {
+      filtros.folio = folioLimpio
+    }
+
+    if (fechaDesde) {
+      filtros.desde = dayjs(fechaDesde).startOf('day').toDate()
+    }
+
+    if (fechaHasta) {
+      filtros.hasta = dayjs(fechaHasta).endOf('day').toDate()
+    }
+
+    return filtros
+  }, [estatusFiltro, folioFiltro, fechaDesde, fechaHasta])
   const {
     data: pedidos,
     isLoading,
     isFetching,
-  } = usePedidos({}, { enabled: authReady })
+  } = usePedidos(filtrosPedidos, { enabled: authReady })
   const pedidosLoading = loading || isLoading || (authReady && isFetching && !pedidos)
   const createPedido = useCreatePedido()
   const actualizarEstado = useActualizarEstadoPedido()
@@ -168,24 +197,60 @@ export default function PedidosPage() {
           <CardTitle className="text-base font-semibold">Pedidos</CardTitle>
           <p className="text-xs text-slate-500">Supervisa el flujo de pedidos con una vista adaptable al tacto.</p>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-slate-500">
-            {pedidos?.length ? `${pedidos.length} pedidos en seguimiento` : 'Sin pedidos registrados aún'}
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-slate-500">
+              {pedidos?.length ? `${pedidos.length} pedidos en seguimiento` : 'Sin pedidos registrados aún'}
+            </div>
+            {puedeCrear ? (
+              <Button
+                onClick={() => {
+                  setDetallePedido(null)
+                  setPedidoEdicion(null)
+                  setWizardKey((prev) => prev + 1)
+                  setWizardOpen(true)
+                }}
+                className="hidden sm:inline-flex"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Nuevo pedido</span>
+              </Button>
+            ) : null}
           </div>
-          {puedeCrear ? (
-            <Button
-              onClick={() => {
-                setDetallePedido(null)
-                setPedidoEdicion(null)
-                setWizardKey((prev) => prev + 1)
-                setWizardOpen(true)
-              }}
-              className="hidden sm:inline-flex"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Nuevo pedido</span>
-            </Button>
-          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
+              Estatus
+              <select
+                value={estatusFiltro}
+                onChange={(event) => setEstatusFiltro(event.target.value as PedidoEstado | 'TODOS')}
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="TODOS">Todos</option>
+                {estadosPedido.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {estado}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
+              Folio
+              <Input
+                value={folioFiltro}
+                onChange={(event) => setFolioFiltro(event.target.value)}
+                placeholder="Buscar folio"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
+              Desde
+              <Input type="date" value={fechaDesde} onChange={(event) => setFechaDesde(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
+              Hasta
+              <Input type="date" value={fechaHasta} onChange={(event) => setFechaHasta(event.target.value)} />
+            </label>
+          </div>
         </CardContent>
       </Card>
 

@@ -17,6 +17,9 @@ type PedidosFilters = {
   status?: PedidoEstado | 'TODOS'
   prioridad?: string
   clienteId?: string
+  folio?: string
+  desde?: Date
+  hasta?: Date
 }
 
 type PedidosQueryOptions = {

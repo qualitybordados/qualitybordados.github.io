@@ -3,18 +3,25 @@ import { z } from 'zod'
 const telefonoRegex = /^\d{10}$/
 const rfcRegex = /^([A-ZÑ&]{3,4})(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[A-Z\d]{3}$/
 
+const optionalString = z.string().trim().optional().default('')
+
 export const clienteSchema = z.object({
-  nombre_legal: z.string().min(3, 'Ingresa el nombre fiscal'),
-  alias: z.string().min(2, 'Ingresa un alias'),
-  rfc: z.string().toUpperCase().regex(rfcRegex, 'RFC inválido'),
-  email: z.string().email('Correo inválido'),
-  telefono: z.string().regex(telefonoRegex, 'Teléfono a 10 dígitos'),
-  direccion: z.string().min(5, 'Dirección requerida'),
-  ciudad: z.string().min(2, 'Ciudad requerida'),
-  cp: z.string().min(5, 'Código postal requerido'),
-  limite_credito: z.coerce.number().min(0).multipleOf(0.01),
-  dias_credito: z.coerce.number().int().min(0),
-  estatus: z.enum(['ACTIVO', 'PAUSADO']),
+  nombre_legal: optionalString,
+  alias: z.string().trim().min(2, 'Ingresa un alias'),
+  rfc: optionalString
+    .transform((value) => value.toUpperCase())
+    .refine((value) => !value || rfcRegex.test(value), 'RFC inválido'),
+  email: optionalString.refine(
+    (value) => !value || z.string().email().safeParse(value).success,
+    'Correo inválido',
+  ),
+  telefono: z.string().trim().regex(telefonoRegex, 'Teléfono a 10 dígitos'),
+  direccion: optionalString,
+  ciudad: optionalString,
+  cp: optionalString.refine((value) => !value || value.length >= 5, 'Código postal a 5 dígitos'),
+  limite_credito: z.coerce.number().min(0).multipleOf(0.01).optional().default(0),
+  dias_credito: z.coerce.number().int().min(0).optional().default(0),
+  estatus: z.enum(['ACTIVO', 'PAUSADO']).optional().default('ACTIVO'),
 })
 
 export const pedidoItemSchema = z.object({

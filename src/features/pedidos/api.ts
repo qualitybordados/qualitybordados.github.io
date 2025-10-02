@@ -33,6 +33,9 @@ export async function fetchPedidos(params?: {
   status?: PedidoEstado | 'TODOS'
   prioridad?: string
   clienteId?: string
+  folio?: string
+  desde?: Date
+  hasta?: Date
 }) {
   const conditions: ReturnType<typeof where>[] = []
   if (params?.status && params.status !== 'TODOS') {
@@ -40,6 +43,15 @@ export async function fetchPedidos(params?: {
   }
   if (params?.prioridad && params.prioridad !== 'TODAS') {
     conditions.push(where('prioridad', '==', params.prioridad))
+  }
+  if (params?.folio) {
+    conditions.push(where('folio', '==', params.folio))
+  }
+  if (params?.desde) {
+    conditions.push(where('fecha_pedido', '>=', Timestamp.fromDate(params.desde)))
+  }
+  if (params?.hasta) {
+    conditions.push(where('fecha_pedido', '<=', Timestamp.fromDate(params.hasta)))
   }
 
   const pedidosMap = new Map<string, Pedido>()

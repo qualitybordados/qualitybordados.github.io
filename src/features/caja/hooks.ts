@@ -1,12 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { actualizarMovimientoCaja, crearMovimientoCaja, eliminarMovimientoCaja, fetchMovimientosCaja } from './api'
+import {
+  actualizarMovimientoCaja,
+  crearMovimientoCaja,
+  eliminarMovimientoCaja,
+  fetchMovimientosCaja,
+  type MovimientoCajaConDetalles,
+} from './api'
 import { MovimientoCajaForm } from '@/lib/validators'
 
 const CAJA_KEY = ['caja']
 
 type CajaFilters = {
   tipo?: 'INGRESO' | 'EGRESO' | 'TODOS'
-  categoria?: string
   desde?: Date
   hasta?: Date
 }
@@ -16,7 +21,7 @@ type CajaQueryOptions = {
 }
 
 export function useMovimientosCaja(filters: CajaFilters = {}, options: CajaQueryOptions = {}) {
-  return useQuery({
+  return useQuery<MovimientoCajaConDetalles[]>({
     queryKey: [...CAJA_KEY, filters],
     queryFn: () => fetchMovimientosCaja(filters),
     staleTime: 1000 * 30,

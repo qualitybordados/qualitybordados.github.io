@@ -14,25 +14,37 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { Abono, Pedido, MovimientoCaja } from '@/lib/types'
+import { Abono, Cliente, Pedido, MovimientoCaja } from '@/lib/types'
 import { MovimientoCajaForm } from '@/lib/validators'
-import { abonosCollection, registrarBitacora } from '@/lib/firestore'
+import { abonosCollection, getDocumentId, registrarBitacora } from '@/lib/firestore'
 import { eliminarAbonoPedido } from '@/features/cobranza/api'
 
 const movimientosRef = collection(db, 'movimientos_caja')
 
+export type MovimientoCajaConDetalles = MovimientoCaja & {
+  referenciaPedidoId?: string | null
+  pedido?: {
+    id: string
+    folio: string
+    status: Pedido['status']
+    fecha_compromiso: Pedido['fecha_compromiso']
+  }
+  cliente?: {
+    id: string
+    alias: string
+    nombre_legal?: string
+    telefono?: string
+  }
+}
+
 export async function fetchMovimientosCaja(params?: {
   tipo?: 'INGRESO' | 'EGRESO' | 'TODOS'
-  categoria?: string
   desde?: Date
   hasta?: Date
 }) {
   const conditions = []
   if (params?.tipo && params.tipo !== 'TODOS') {
     conditions.push(where('tipo', '==', params.tipo))
-  }
-  if (params?.categoria) {
-    conditions.push(where('categoria', '==', params.categoria))
   }
   if (params?.desde) {
     conditions.push(where('fecha', '>=', Timestamp.fromDate(params.desde)))
@@ -42,7 +54,103 @@ export async function fetchMovimientosCaja(params?: {
   }
   const q = query(movimientosRef, ...conditions, orderBy('fecha', 'desc'), limit(200))
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<MovimientoCaja, 'id'>) }))
+  const movimientos = snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...(docSnap.data() as Omit<MovimientoCaja, 'id'>),
+  }))
+
+  const pedidoIds = new Set<string>()
+  movimientos.forEach((movimiento) => {
+    if (!movimiento.referencia_pedido_id) {
+      return
+    }
+
+    try {
+      const pedidoId = getDocumentId(movimiento.referencia_pedido_id)
+      pedidoIds.add(pedidoId)
+    } catch (error) {
+      console.error('No se pudo obtener el id del pedido relacionado al movimiento', error)
+    }
+  })
+
+  const pedidosMap = new Map<string, Pedido>()
+  await Promise.all(
+    Array.from(pedidoIds).map(async (pedidoId) => {
+      const pedidoRef = doc(db, 'pedidos', pedidoId)
+      const pedidoSnap = await getDoc(pedidoRef)
+      if (pedidoSnap.exists()) {
+        const pedidoData = pedidoSnap.data() as Omit<Pedido, 'id'>
+        pedidosMap.set(pedidoId, { id: pedidoSnap.id, ...pedidoData })
+      }
+    }),
+  )
+
+  const clienteIds = new Set<string>()
+  pedidosMap.forEach((pedido) => {
+    try {
+      const clienteId = getDocumentId(pedido.cliente_id)
+      clienteIds.add(clienteId)
+    } catch (error) {
+      console.error('No se pudo obtener el id del cliente relacionado al pedido', error)
+    }
+  })
+
+  const clientesMap = new Map<string, Cliente>()
+  await Promise.all(
+    Array.from(clienteIds).map(async (clienteId) => {
+      const clienteRef = doc(db, 'clientes', clienteId)
+      const clienteSnap = await getDoc(clienteRef)
+      if (clienteSnap.exists()) {
+        const clienteData = clienteSnap.data() as Omit<Cliente, 'id'>
+        clientesMap.set(clienteId, { id: clienteSnap.id, ...clienteData })
+      }
+    }),
+  )
+
+  return movimientos.map<MovimientoCajaConDetalles>((movimiento) => {
+    let referenciaPedidoId: string | null = null
+    let pedidoDetalle: MovimientoCajaConDetalles['pedido']
+    let clienteDetalle: MovimientoCajaConDetalles['cliente']
+
+    if (movimiento.referencia_pedido_id) {
+      try {
+        referenciaPedidoId = getDocumentId(movimiento.referencia_pedido_id)
+        const pedido = referenciaPedidoId ? pedidosMap.get(referenciaPedidoId) : undefined
+        if (pedido) {
+          pedidoDetalle = {
+            id: pedido.id,
+            folio: pedido.folio,
+            status: pedido.status,
+            fecha_compromiso: pedido.fecha_compromiso,
+          }
+
+          try {
+            const clienteId = getDocumentId(pedido.cliente_id)
+            const cliente = clientesMap.get(clienteId)
+            if (cliente) {
+              clienteDetalle = {
+                id: cliente.id,
+                alias: cliente.alias,
+                nombre_legal: cliente.nombre_legal,
+                telefono: cliente.telefono,
+              }
+            }
+          } catch (error) {
+            console.error('No se pudo obtener el cliente relacionado al pedido en movimiento de caja', error)
+          }
+        }
+      } catch (error) {
+        console.error('No se pudo interpretar la referencia del pedido en movimiento de caja', error)
+      }
+    }
+
+    return {
+      ...movimiento,
+      referenciaPedidoId,
+      ...(pedidoDetalle ? { pedido: pedidoDetalle } : {}),
+      ...(clienteDetalle ? { cliente: clienteDetalle } : {}),
+    }
+  })
 }
 
 export async function crearMovimientoCaja(values: MovimientoCajaForm, usuarioId: string) {
