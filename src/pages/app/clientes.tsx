@@ -23,8 +23,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { Alert } from '@/components/ui/alert'
 import { EmptyState } from '@/components/common/empty-state'
-import { Mail, Phone, MapPin, CreditCard, Pencil, Search, Filter, Plus, Trash } from 'lucide-react'
+import { Mail, Phone, MapPin, CreditCard, Pencil, Search, Filter, Plus, Trash, FileText } from 'lucide-react'
 import dayjs from 'dayjs'
+import { ClienteReportesPanel } from '@/features/clientes/components/cliente-reportes'
 
 const estatusFilters = ['TODOS', 'ACTIVO', 'PAUSADO']
 
@@ -45,6 +46,8 @@ export default function ClientesPage() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [detalleOpen, setDetalleOpen] = useState(false)
+  const [reporteCliente, setReporteCliente] = useState<Cliente | null>(null)
+  const [reporteOpen, setReporteOpen] = useState(false)
 
   const canEdit = ['OWNER', 'ADMIN', 'VENTAS'].includes(role ?? '')
 
@@ -92,6 +95,11 @@ export default function ClientesPage() {
   function openDetalle(cliente: Cliente) {
     setClienteSeleccionado(cliente)
     setDetalleOpen(true)
+  }
+
+  function openReporte(cliente: Cliente) {
+    setReporteCliente(cliente)
+    setReporteOpen(true)
   }
 
   return (
@@ -165,6 +173,7 @@ export default function ClientesPage() {
               key={cliente.id}
               cliente={cliente}
               onOpenDetalle={() => openDetalle(cliente)}
+              onOpenReporte={() => openReporte(cliente)}
               onOpenEditar={() => openEditarCliente(cliente)}
               onEliminar={() => handleEliminarCliente(cliente)}
               canEdit={canEdit}
@@ -221,6 +230,29 @@ export default function ClientesPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={reporteOpen} onOpenChange={setReporteOpen}>
+        <DialogContent>
+          {reporteCliente ? (
+            <>
+              <DialogHeader className="items-start text-left">
+                <DialogTitle className="text-xl">Reporte financiero</DialogTitle>
+                <DialogDescription>{reporteCliente.alias}</DialogDescription>
+              </DialogHeader>
+              <DialogBody>
+                <ClienteReportesPanel cliente={reporteCliente} />
+              </DialogBody>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost" className="w-full sm:w-auto">
+                    Cerrar
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -229,12 +261,14 @@ function ClienteCard({
   cliente,
   onOpenDetalle,
   onOpenEditar,
+  onOpenReporte,
   onEliminar,
   canEdit,
 }: {
   cliente: Cliente
   onOpenDetalle: () => void
   onOpenEditar: () => void
+  onOpenReporte: () => void
   onEliminar: () => void
   canEdit: boolean
 }) {
@@ -253,34 +287,48 @@ function ClienteCard({
           </div>
           <p className="text-sm text-slate-500">{cliente.nombre_legal}</p>
         </div>
-        {canEdit ? (
-          <div className="flex items-center gap-2">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-10 w-10 border border-slate-200"
-              onClick={(event) => {
-                event.stopPropagation()
-                onOpenEditar()
-              }}
-              aria-label="Editar cliente"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-10 w-10 border border-slate-200 text-destructive"
-              onClick={(event) => {
-                event.stopPropagation()
-                onEliminar()
-              }}
-              aria-label="Eliminar cliente"
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-10 w-10 border border-slate-200"
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpenReporte()
+            }}
+            aria-label="Generar reporte"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+          {canEdit ? (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenEditar()
+                }}
+                aria-label="Editar cliente"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10 border border-slate-200 text-destructive"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onEliminar()
+                }}
+                aria-label="Eliminar cliente"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 space-y-3 text-sm text-slate-600">
@@ -322,10 +370,11 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
     <>
       <DialogBody className="space-y-6">
         <Tabs defaultValue="datos" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 rounded-full bg-slate-100 p-1 text-xs">
+          <TabsList className="grid w-full grid-cols-4 rounded-full bg-slate-100 p-1 text-xs">
             <TabsTrigger value="datos" className="rounded-full">Datos</TabsTrigger>
             <TabsTrigger value="pedidos" className="rounded-full">Pedidos</TabsTrigger>
             <TabsTrigger value="saldos" className="rounded-full">Saldos</TabsTrigger>
+            <TabsTrigger value="reportes" className="rounded-full">Reportes</TabsTrigger>
           </TabsList>
           <TabsContent value="datos" className="mt-4 space-y-3 text-sm">
             <InfoRow label="RFC" value={cliente.rfc} />
@@ -360,6 +409,9 @@ function ClienteDetalle({ cliente, puedeEliminar, onEliminar }: { cliente: Clien
               title={saldoTotal > 0 ? 'Saldo pendiente' : 'Cliente al corriente'}
               description={`Saldo total: ${formatCurrency(saldoTotal)}`}
             />
+          </TabsContent>
+          <TabsContent value="reportes" className="mt-4">
+            <ClienteReportesPanel cliente={cliente} />
           </TabsContent>
         </Tabs>
       </DialogBody>
