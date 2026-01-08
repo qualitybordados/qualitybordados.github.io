@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardData } from '@/features/dashboard/hooks'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -10,12 +11,23 @@ import { CalendarDays, AlertTriangle, TrendingUp, Package } from 'lucide-react'
 import dayjs from 'dayjs'
 import { clsx } from 'clsx'
 import type { ComponentType } from 'react'
+import { Input } from '@/components/ui/input'
+import { normalizeSearchTerm } from '@/lib/search'
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
   const authReady = !!user && !loading
   const { data, isLoading, isFetching, isError } = useDashboardData({ enabled: authReady })
   const dashboardLoading = loading || isLoading || (authReady && isFetching && !data)
+  const [clienteFiltro, setClienteFiltro] = useState('')
+  const clienteFiltroNormalizado = useMemo(() => normalizeSearchTerm(clienteFiltro), [clienteFiltro])
+  const proximasEntregasFiltradas = useMemo(() => {
+    if (!data?.proximasEntregas) return []
+    if (!clienteFiltroNormalizado) return data.proximasEntregas
+    return data.proximasEntregas.filter((pedido) =>
+      normalizeSearchTerm(pedido.cliente).includes(clienteFiltroNormalizado),
+    )
+  }, [clienteFiltroNormalizado, data?.proximasEntregas])
 
   if (dashboardLoading) {
     return (
@@ -119,14 +131,23 @@ export default function DashboardPage() {
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Próximas entregas</h2>
-          <Badge variant="neutral">{data.proximasEntregas?.length ?? 0} pendientes</Badge>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between sm:gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Próximas entregas</h2>
+            <Badge variant="neutral">{proximasEntregasFiltradas.length} pendientes</Badge>
+          </div>
+          <div className="w-full sm:max-w-xs">
+            <Input
+              value={clienteFiltro}
+              onChange={(event) => setClienteFiltro(event.target.value)}
+              placeholder="Buscar por cliente"
+            />
+          </div>
         </div>
         <Card>
           <CardContent className="flex flex-col gap-3 p-4">
-            {data.proximasEntregas && data.proximasEntregas.length ? (
-              data.proximasEntregas.map((pedido) => {
+            {proximasEntregasFiltradas.length ? (
+              proximasEntregasFiltradas.map((pedido) => {
                 const dias = Math.max(dayjs(pedido.fecha_compromiso).diff(dayjs(), 'day'), 0)
                 return (
                   <div

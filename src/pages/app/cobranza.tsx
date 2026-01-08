@@ -15,6 +15,8 @@ import { Pedido } from '@/lib/types'
 import { PedidoQuickActionsDialog } from '@/features/pedidos/components/pedido-quick-actions-dialog'
 import { AbonoDialogForm } from '@/components/common/abono-dialog-form'
 import dayjs from 'dayjs'
+import { normalizeSearchTerm } from '@/lib/search'
+import { Input } from '@/components/ui/input'
 
 export default function CobranzaPage() {
   const { user, role, loading } = useAuth()
@@ -27,6 +29,17 @@ export default function CobranzaPage() {
     if (!clientes) return new Map<string, string>()
     return new Map(clientes.map((cliente) => [cliente.id, cliente.alias]))
   }, [clientes])
+  const [clienteFiltro, setClienteFiltro] = useState('')
+  const clienteFiltroNormalizado = useMemo(() => normalizeSearchTerm(clienteFiltro), [clienteFiltro])
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return []
+    if (!clienteFiltroNormalizado) return pedidos
+    return pedidos.filter((pedido) => {
+      const clienteId = getDocumentId(pedido.cliente_id)
+      const clienteNombre = clientesMap.get(clienteId) ?? clienteId
+      return normalizeSearchTerm(clienteNombre).includes(clienteFiltroNormalizado)
+    })
+  }, [clienteFiltroNormalizado, clientesMap, pedidos])
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<Pedido | null>(null)
   const updatePedido = useUpdatePedido()
   const eliminarPedido = useEliminarPedido()
@@ -57,9 +70,19 @@ export default function CobranzaPage() {
           <CardTitle className="text-base font-semibold">Créditos y cobranza</CardTitle>
           <p className="text-xs text-slate-500">Monitorea los pedidos con saldo pendiente y registra abonos al instante.</p>
         </CardHeader>
-        <CardContent className="flex items-center justify-between text-xs text-slate-500">
-          <span>{pedidos?.length ? `${pedidos.length} pedidos con saldo` : 'Sin cartera vencida'}</span>
-          <Badge variant="warning" className="uppercase">Revisa diariamente</Badge>
+        <CardContent className="space-y-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between">
+            <span>{pedidosFiltrados.length ? `${pedidosFiltrados.length} pedidos con saldo` : 'Sin cartera vencida'}</span>
+            <Badge variant="warning" className="uppercase">Revisa diariamente</Badge>
+          </div>
+          <label className="flex flex-col gap-1 text-[11px] uppercase text-slate-500">
+            Cliente
+            <Input
+              value={clienteFiltro}
+              onChange={(event) => setClienteFiltro(event.target.value)}
+              placeholder="Buscar cliente"
+            />
+          </label>
         </CardContent>
       </Card>
 
@@ -73,8 +96,8 @@ export default function CobranzaPage() {
               </div>
             </Card>
           ))
-        ) : pedidos && pedidos.length ? (
-          pedidos.map((pedido) => (
+        ) : pedidosFiltrados.length ? (
+          pedidosFiltrados.map((pedido) => (
             <CobranzaCard
               key={pedido.id}
               pedido={pedido}
@@ -227,4 +250,3 @@ function CobranzaCard({
     </Card>
   )
 }
-

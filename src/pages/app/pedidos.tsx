@@ -52,6 +52,7 @@ import { PedidoForm, PedidoItemForm } from '@/lib/validators'
 import { clsx } from 'clsx'
 import { generatePedidoPdf } from '@/features/pedidos/pdf'
 import { AbonoDialogForm } from '@/components/common/abono-dialog-form'
+import { normalizeSearchTerm } from '@/lib/search'
 
 const estadosPedido: PedidoEstado[] = [
   'COTIZACIÓN',
@@ -84,6 +85,7 @@ export default function PedidosPage() {
   const authReady = !!user && !loading
   const [estatusFiltro, setEstatusFiltro] = useState<PedidoEstado | 'TODOS'>('TODOS')
   const [folioFiltro, setFolioFiltro] = useState('')
+  const [clienteFiltro, setClienteFiltro] = useState('')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const filtrosPedidos = useMemo(() => {
@@ -128,6 +130,17 @@ export default function PedidosPage() {
     if (!clientesData) return new Map<string, Cliente>()
     return new Map(clientesData.map((cliente) => [cliente.id, cliente]))
   }, [clientesData])
+  const clienteFiltroNormalizado = useMemo(() => normalizeSearchTerm(clienteFiltro), [clienteFiltro])
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return []
+    if (!clienteFiltroNormalizado) return pedidos
+    return pedidos.filter((pedido) => {
+      const clienteId = getDocumentId(pedido.cliente_id)
+      const cliente = clientesMap.get(clienteId)
+      const clienteNombre = cliente?.alias ?? cliente?.nombre_legal ?? clienteId
+      return normalizeSearchTerm(clienteNombre).includes(clienteFiltroNormalizado)
+    })
+  }, [clienteFiltroNormalizado, clientesMap, pedidos])
 
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detallePedido, setDetallePedido] = useState<Pedido | null>(null)
@@ -200,7 +213,7 @@ export default function PedidosPage() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
-              {pedidos?.length ? `${pedidos.length} pedidos en seguimiento` : 'Sin pedidos registrados aún'}
+              {pedidosFiltrados.length ? `${pedidosFiltrados.length} pedidos en seguimiento` : 'Sin pedidos registrados aún'}
             </div>
             {puedeCrear ? (
               <Button
@@ -218,7 +231,7 @@ export default function PedidosPage() {
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
               Estatus
               <select
@@ -240,6 +253,14 @@ export default function PedidosPage() {
                 value={folioFiltro}
                 onChange={(event) => setFolioFiltro(event.target.value)}
                 placeholder="Buscar folio"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
+              Cliente
+              <Input
+                value={clienteFiltro}
+                onChange={(event) => setClienteFiltro(event.target.value)}
+                placeholder="Buscar cliente"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs uppercase text-slate-500">
@@ -265,8 +286,8 @@ export default function PedidosPage() {
               </div>
             </Card>
           ))
-        ) : pedidos && pedidos.length ? (
-          pedidos.map((pedido) => {
+        ) : pedidosFiltrados.length ? (
+          pedidosFiltrados.map((pedido) => {
             const estadoIndex = estadosPedido.indexOf(pedido.status)
             const siguienteEstado = estadosPedido[estadoIndex + 1]
             const anteriorEstado = estadosPedido[estadoIndex - 1]
