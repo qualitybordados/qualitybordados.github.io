@@ -137,8 +137,10 @@ export default function PedidosPage() {
     return pedidos.filter((pedido) => {
       const clienteId = getDocumentId(pedido.cliente_id)
       const cliente = clientesMap.get(clienteId)
-      const clienteNombre = cliente?.alias ?? cliente?.nombre_legal ?? clienteId
-      return normalizeSearchTerm(clienteNombre).includes(clienteFiltroNormalizado)
+      const clienteAlias = cliente?.alias ?? ''
+      const clienteFiscal = cliente?.nombre_legal ?? ''
+      const terminos = [clienteAlias, clienteFiscal, clienteId].filter(Boolean)
+      return terminos.some((termino) => normalizeSearchTerm(termino).includes(clienteFiltroNormalizado))
     })
   }, [clienteFiltroNormalizado, clientesMap, pedidos])
 
